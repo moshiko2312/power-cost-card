@@ -11,11 +11,8 @@ class PowerCostCardEditor extends HTMLElement {
   }
 
   set hass(hass) {
-    const shouldRender = !this._hass;
     this._hass = hass;
-    if (shouldRender) {
-      this._render();
-    }
+    this._render();
   }
 
   _emitConfig(config) {
@@ -45,12 +42,6 @@ class PowerCostCardEditor extends HTMLElement {
 
     if (isBoolean) {
       config[field] = Boolean(rawValue);
-      if (field === "radio_mode" && Boolean(rawValue)) {
-        config.show_minimize = false;
-      }
-      if (field === "show_minimize" && Boolean(rawValue)) {
-        config.radio_mode = false;
-      }
     } else if (isNumber) {
       config[field] = rawValue === "" ? undefined : Number(rawValue);
     } else {
@@ -59,7 +50,6 @@ class PowerCostCardEditor extends HTMLElement {
 
     this._config = config;
     this._emitConfig(config);
-    this._render();
   }
 
   _addEntityRow() {
@@ -117,7 +107,7 @@ class PowerCostCardEditor extends HTMLElement {
     this._saveEntities(entities);
   }
 
-  _entityDatalistOptions(domains) {
+  _entityOptions(domains) {
     const states = this._hass?.states || {};
     const options = Object.keys(states)
       .filter((entityId) => domains.includes(entityId.split(".")[0]))
@@ -130,7 +120,7 @@ class PowerCostCardEditor extends HTMLElement {
     return options
       .map((entityId) => {
         const friendly = states[entityId]?.attributes?.friendly_name || entityId;
-        return `<option value="${entityId}" label="${friendly}"></option>`;
+        return `<option value="${entityId}">${friendly} (${entityId})</option>`;
       })
       .join("");
   }
@@ -228,8 +218,8 @@ class PowerCostCardEditor extends HTMLElement {
   _render() {
     const config = this._config || {};
     const entities = this._getEntities();
-    const mainEntityOptions = this._entityDatalistOptions(["light", "switch", "fan", "climate"]);
-    const powerEntityOptions = this._entityDatalistOptions(["sensor"]);
+    const mainEntityOptions = this._entityOptions(["light", "switch", "fan", "climate"]);
+    const powerEntityOptions = this._entityOptions(["sensor"]);
 
     this.innerHTML = `
       <style>
@@ -303,17 +293,6 @@ class PowerCostCardEditor extends HTMLElement {
           font-size: 12px;
           opacity: 0.75;
           line-height: 1.4;
-        }
-        .editor-section {
-          display: grid;
-          gap: 10px;
-          padding: 12px;
-          border: 1px solid var(--divider-color);
-          border-radius: 12px;
-        }
-        .section-title {
-          font-size: 14px;
-          font-weight: 700;
         }
         .icon-picker {
           position: relative;
@@ -450,34 +429,6 @@ class PowerCostCardEditor extends HTMLElement {
           <input data-field="title" value="${config.title || ""}">
         </label>
 
-        <div class="editor-section">
-          <div class="section-title">רקע הכרטיס</div>
-
-          <label>
-            <span>נתיב תמונת רקע</span>
-            <input data-field="background_image" placeholder="/media/local/power_bg.jpg" value="${config.background_image || ""}">
-          </label>
-
-          <label>
-            <span>שקיפות תמונה (0.18 או 18)</span>
-            <input data-field="background_opacity" type="number" min="0" max="100" step="0.01" value="${config.background_opacity ?? 0.18}">
-          </label>
-
-          <label>
-            <span>טשטוש תמונה (px)</span>
-            <input data-field="background_blur" type="number" min="0" max="8" step="1" value="${config.background_blur ?? 0}">
-          </label>
-
-          <label>
-            <span>גודל תמונה</span>
-            <select data-field="background_size">
-              <option value="cover" ${config.background_size === "cover" || !config.background_size ? "selected" : ""}>Cover / מילוי</option>
-              <option value="contain" ${config.background_size === "contain" ? "selected" : ""}>Contain / התאמה</option>
-              <option value="auto" ${config.background_size === "auto" ? "selected" : ""}>Auto</option>
-            </select>
-          </label>
-        </div>
-
         <label>
           <span>מטבע ברירת מחדל</span>
           <input data-field="currency" value="${config.currency || "₪"}">
@@ -501,7 +452,6 @@ class PowerCostCardEditor extends HTMLElement {
           <label><input data-field="show_formula" type="checkbox" ${config.show_formula !== false ? "checked" : ""}> הצג נוסחת חישוב</label>
           <label><input data-field="show_graph" type="checkbox" ${config.show_graph === true ? "checked" : ""}> הצג גרף בכרטיס</label>
           <label><input data-field="show_minimize" type="checkbox" ${config.show_minimize !== false ? "checked" : ""}> אפשר מזעור כרטיסים</label>
-          <label><input data-field="radio_mode" type="checkbox" ${config.radio_mode === true ? "checked" : ""}> מצב רדיו</label>
           <label><input data-field="enable_icon_animation" type="checkbox" ${config.enable_icon_animation !== false ? "checked" : ""}> אפשר אנימציית אייקון</label>
         </div>
 
@@ -513,16 +463,10 @@ class PowerCostCardEditor extends HTMLElement {
                 <div class="entity-grid">
                   <label>
                     <span>Entity</span>
-                    <input
-                      data-row-field="entity"
-                      data-index="${index}"
-                      value="${row.entity || ""}"
-                      list="power-cost-entity-list"
-                      placeholder="בחר או כתוב entity"
-                      autocapitalize="off"
-                      autocorrect="off"
-                      spellcheck="false"
-                    >
+                    <select data-row-field="entity" data-index="${index}">
+                      <option value="">בחר light / switch / fan / climate</option>
+                      ${mainEntityOptions}
+                    </select>
                   </label>
 
                   <label>
@@ -579,16 +523,10 @@ class PowerCostCardEditor extends HTMLElement {
 
                   <label>
                     <span>Power entity</span>
-                    <input
-                      data-row-field="power_entity"
-                      data-index="${index}"
-                      value="${row.power_entity || ""}"
-                      list="power-cost-power-entity-list"
-                      placeholder="בחר או כתוב sensor"
-                      autocapitalize="off"
-                      autocorrect="off"
-                      spellcheck="false"
-                    >
+                    <select data-row-field="power_entity" data-index="${index}">
+                      <option value="">בחר sensor</option>
+                      ${powerEntityOptions}
+                    </select>
                   </label>
 
                   <label>
@@ -614,16 +552,8 @@ class PowerCostCardEditor extends HTMLElement {
           </div>
         </div>
 
-        <datalist id="power-cost-entity-list">
-          ${mainEntityOptions}
-        </datalist>
-
-        <datalist id="power-cost-power-entity-list">
-          ${powerEntityOptions}
-        </datalist>
-
         <div class="hint">
-          אפשר לבחור מהרשימה או לכתוב entity ידנית. בשדה הראשי מומלץ להשתמש ב־light / switch / fan / climate, ובשדה power_entity ב־sensor.
+          כדי לשמור שורה, חייב להיות entity ראשי. אפשר לבחור אייקון מותאם אישית, power_w קבוע או power_entity מסוג sensor.
         </div>
       </div>
     `;
@@ -632,7 +562,7 @@ class PowerCostCardEditor extends HTMLElement {
       const field = el.dataset.field;
       if (el.type === "checkbox") {
         el.addEventListener("change", (ev) => this._updateTopField(field, ev.target.checked, true, false));
-      } else if (["refresh_seconds", "default_price_per_kwh", "background_opacity", "background_blur"].includes(field)) {
+      } else if (["refresh_seconds", "default_price_per_kwh"].includes(field)) {
         el.addEventListener("change", (ev) => this._updateTopField(field, ev.target.value, false, true));
       } else {
         el.addEventListener("change", (ev) => this._updateTopField(field, ev.target.value, false, false));
@@ -746,10 +676,6 @@ class PowerCostCard extends HTMLElement {
     return {
       type: "custom:power-cost-card",
       title: "עלות צריכת חשמל",
-      background_image: "",
-      background_opacity: 0.18,
-      background_blur: 0,
-      background_size: "cover",
       currency: "₪",
       default_price_per_kwh: 0.52,
       refresh_seconds: 60,
@@ -760,8 +686,7 @@ class PowerCostCard extends HTMLElement {
       show_formula: true,
       show_graph: false,
       show_minimize: true,
-      radio_mode: false,
-      enable_icon_animation: false,
+      enable_icon_animation: true,
       entities: [
         {
           entity: "light.bedroom",
@@ -807,57 +732,6 @@ class PowerCostCard extends HTMLElement {
     }
   }
 
-
-  _buildRelevantStateSignature(hass) {
-    const entities = this._config?.entities || [];
-    const parts = [];
-
-    for (const cfg of entities) {
-      const ids = [cfg.entity, cfg.power_entity].filter(Boolean);
-      for (const entityId of ids) {
-        const st = hass?.states?.[entityId];
-        parts.push(
-          [
-            entityId,
-            st?.state ?? "",
-            st?.last_changed ?? "",
-            st?.attributes?.icon ?? "",
-            st?.attributes?.friendly_name ?? "",
-          ].join("|")
-        );
-      }
-    }
-
-    return parts.join("||");
-  }
-
-
-  _isRowCollapsed(row) {
-    if (!row?.allowMinimize) {
-      return false;
-    }
-
-    if (this._config?.radio_mode) {
-      return this._collapsedCards[row.entityId] !== false;
-    }
-
-    return this._config?.show_minimize && !!this._collapsedCards[row.entityId];
-  }
-
-
-  _normalizeBackgroundOpacity(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return 0.18;
-    if (n > 1) return Math.max(0, Math.min(1, n / 100));
-    return Math.max(0, Math.min(1, n));
-  }
-
-  _resolveBackgroundImage() {
-    const raw = this._config?.background_image;
-    if (!raw || typeof raw !== "string") return "";
-    return raw.trim();
-  }
-
   setConfig(config) {
     if (!config) throw new Error("Invalid configuration");
 
@@ -880,10 +754,6 @@ class PowerCostCard extends HTMLElement {
 
     this._config = {
       title: config.title || "עלות צריכת חשמל",
-      background_image: config.background_image || "",
-      background_opacity: config.background_opacity ?? 0.18,
-      background_blur: config.background_blur ?? 0,
-      background_size: config.background_size || "cover",
       currency: config.currency || "₪",
       default_price_per_kwh:
         config.default_price_per_kwh != null ? Number(config.default_price_per_kwh) : undefined,
@@ -895,8 +765,7 @@ class PowerCostCard extends HTMLElement {
       show_formula: config.show_formula !== false,
       show_graph: config.show_graph === true,
       show_minimize: config.show_minimize !== false,
-      radio_mode: config.radio_mode === true,
-      enable_icon_animation: config.enable_icon_animation === true,
+      enable_icon_animation: config.enable_icon_animation !== false,
       entities: normalizedEntities,
     };
 
@@ -918,26 +787,9 @@ class PowerCostCard extends HTMLElement {
   }
 
   set hass(hass) {
-    const firstLoad = !this._hass;
     this._hass = hass;
-
-    if (!this._config) {
-      return;
-    }
-
-    const nextSignature = this._buildRelevantStateSignature(hass);
-
-    if (firstLoad) {
-      this._lastRelevantStateSignature = nextSignature;
-      this._refreshAllHistory();
-      this._render();
-      return;
-    }
-
-    if (nextSignature !== this._lastRelevantStateSignature) {
-      this._lastRelevantStateSignature = nextSignature;
-      this._render();
-    }
+    this._refreshAllHistory();
+    this._render();
   }
 
   getCardSize() {
@@ -996,7 +848,7 @@ class PowerCostCard extends HTMLElement {
   }
 
   _handleClick(ev) {
-    const period = ev.target?.dataset?.period || ev.target?.closest?.("[data-period]")?.dataset?.period;
+    const period = ev.target?.dataset?.period;
     const moreInfoEntity =
       ev.target?.dataset?.moreInfo || ev.target?.closest?.("[data-more-info]")?.dataset?.moreInfo;
 
@@ -1007,39 +859,17 @@ class PowerCostCard extends HTMLElement {
       return;
     }
 
-    const graphToggleEntity =
-      ev.target?.dataset?.graphToggle || ev.target?.closest?.("[data-graph-toggle]")?.dataset?.graphToggle;
-    const collapseToggleEntity =
-      ev.target?.dataset?.collapseToggle || ev.target?.closest?.("[data-collapse-toggle]")?.dataset?.collapseToggle;
+    const graphToggleEntity = ev.target?.dataset?.graphToggle;
+    const collapseToggleEntity = ev.target?.dataset?.collapseToggle;
 
     if (ev.target?.closest?.("[data-toggle]")) {
       ev.stopPropagation();
       return;
     }
 
-    if (collapseToggleEntity && (this._config?.show_minimize || this._config?.radio_mode)) {
+    if (collapseToggleEntity && this._config?.show_minimize) {
       ev.stopPropagation();
-
-      if (this._config?.radio_mode) {
-        const entities = this._config?.entities || [];
-        const currentlyCollapsed = this._collapsedCards[collapseToggleEntity] !== false;
-
-        if (currentlyCollapsed) {
-          const nextState = {};
-          entities.forEach((cfg) => {
-            if (cfg?.entity && cfg.allow_minimize !== false) {
-              nextState[cfg.entity] = true;
-            }
-          });
-          nextState[collapseToggleEntity] = false;
-          this._collapsedCards = nextState;
-        } else {
-          this._collapsedCards[collapseToggleEntity] = true;
-        }
-      } else {
-        this._collapsedCards[collapseToggleEntity] = !this._collapsedCards[collapseToggleEntity];
-      }
-
+      this._collapsedCards[collapseToggleEntity] = !this._collapsedCards[collapseToggleEntity];
       this._saveUiState();
       this._render();
       return;
@@ -1065,23 +895,17 @@ class PowerCostCard extends HTMLElement {
   }
 
   _handleChange(ev) {
-    const toggleEntity =
-      ev.target?.dataset?.toggle || ev.target?.closest?.("[data-toggle]")?.dataset?.toggle;
+    const toggleEntity = ev.target?.dataset?.toggle || ev.target?.closest?.("[data-toggle]")?.dataset?.toggle;
     if (!toggleEntity || !this._hass) return;
 
-    const stateObj = this._hass.states?.[toggleEntity];
-    const checked =
-      typeof ev.target?.checked === "boolean"
-        ? ev.target.checked
-        : !this._isOnState(stateObj?.state);
-
+    const checked = ev.target?.checked ?? false;
     const domain = String(toggleEntity).split(".")[0];
-    const service = checked ? "turn_on" : "turn_off";
+    let service = checked ? "turn_on" : "turn_off";
 
-    if (["fan", "light", "switch", "climate"].includes(domain)) {
+    if (domain === "fan" || domain === "light" || domain === "switch" || domain === "climate") {
       this._hass.callService(domain, service, { entity_id: toggleEntity });
     } else {
-      this._hass.callService("homeassistant", service, { entity_id: toggleEntity });
+      this._hass.callService("homeassistant", checked ? "turn_on" : "turn_off", { entity_id: toggleEntity });
     }
 
     ev.stopPropagation();
@@ -1342,7 +1166,7 @@ class PowerCostCard extends HTMLElement {
   _renderGraphToggle(entityId) {
     const expanded = !!this._expandedGraphs[entityId];
     const buttonLabel = expanded ? "הסתר גרף" : "הצג גרף";
-    return `<button type="button" class="graph-toggle-btn" data-graph-toggle="${entityId}">${buttonLabel}</button>`;
+    return `<button class="graph-toggle-btn" data-graph-toggle="${entityId}">${buttonLabel}</button>`;
   }
 
   _renderPremiumGraph(entityCfg) {
@@ -1496,8 +1320,6 @@ class PowerCostCard extends HTMLElement {
       .join("");
   }
 
-
-
   _render() {
     if (!this._config) return;
 
@@ -1509,11 +1331,6 @@ class PowerCostCard extends HTMLElement {
     const mostExpensive = rows.length ? rows.reduce((a,b)=> b.cost>a.cost?b:a) : null;
     const top3 = [...rows].sort((a,b)=>b.cost-a.cost).slice(0,3);
     const anyError = rows.some((row) => row.error);
-    const bgImage = this._resolveBackgroundImage();
-    const bgOpacity = this._normalizeBackgroundOpacity(this._config?.background_opacity);
-    const bgBlur = Math.max(0, Math.min(8, Number(this._config?.background_blur || 0)));
-    const bgSize = this._config?.background_size || "cover";
-    const bgFilter = bgBlur > 0 ? `filter: blur(${bgBlur}px);` : "";
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -1525,39 +1342,7 @@ class PowerCostCard extends HTMLElement {
         }
 
         ha-card {
-          position: relative;
           overflow: hidden;
-        }
-
-        .pcc-bg-layer {
-          position: absolute;
-          inset: 0;
-          background-image: url("${bgImage}");
-          background-size: ${bgSize};
-          background-position: center;
-          background-repeat: no-repeat;
-          opacity: ${bgOpacity};
-          ${bgFilter}
-          pointer-events: none;
-          z-index: 0;
-        }
-
-        .pcc-bg-overlay {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.18));
-          pointer-events: none;
-          z-index: 0;
-        }
-
-        .wrap {
-          position: relative;
-          z-index: 1;
-        }
-
-        .wrap {
-          position: relative;
-          z-index: 1;
         }
 
         .wrap {
@@ -1720,17 +1505,14 @@ class PowerCostCard extends HTMLElement {
         @keyframes powerCostIconPulse {
           0% {
             transform: scale(1);
-            opacity: 0.9;
             filter: drop-shadow(0 0 0 rgba(255, 193, 7, 0));
           }
           50% {
-            transform: scale(1.12);
-            opacity: 1;
-            filter: drop-shadow(0 0 12px rgba(255, 193, 7, 0.45));
+            transform: scale(1.08);
+            filter: drop-shadow(0 0 10px rgba(255, 193, 7, 0.35));
           }
           100% {
             transform: scale(1);
-            opacity: 0.9;
             filter: drop-shadow(0 0 0 rgba(255, 193, 7, 0));
           }
         }
@@ -1738,11 +1520,10 @@ class PowerCostCard extends HTMLElement {
         .entity-icon {
           transition: color 160ms ease, transform 160ms ease, opacity 160ms ease, filter 160ms ease;
           transform-origin: center;
-          will-change: transform, opacity, filter;
         }
 
         .entity-icon.on {
-          animation: powerCostIconPulse 1.7s ease-in-out infinite;
+          animation: powerCostIconPulse 2.2s ease-in-out infinite;
         }
 
         .name-wrap {
@@ -1839,27 +1620,6 @@ class PowerCostCard extends HTMLElement {
           gap: 8px;
         }
 
-        .radio-btn {
-          border: 1px solid var(--divider-color);
-          background: transparent;
-          color: var(--primary-text-color);
-          border-radius: 999px;
-          padding: 7px 10px;
-          cursor: pointer;
-          font: inherit;
-          font-size: 13px;
-          min-width: 78px;
-        }
-
-        .row.radio {
-          transition: border-color 160ms ease, box-shadow 160ms ease;
-        }
-
-        .row.radio.open {
-          border-color: color-mix(in srgb, var(--primary-color) 28%, var(--divider-color));
-          box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-        }
-
         .row.collapsed {
           padding: 12px 14px;
         }
@@ -1914,7 +1674,6 @@ class PowerCostCard extends HTMLElement {
       </style>
 
       <ha-card>
-        ${bgImage ? `<div class="pcc-bg-layer"></div><div class="pcc-bg-overlay"></div>` : ""}
         <div class="wrap">
           <div class="head">
             <div class="title">${this._config.title}</div>
@@ -1959,7 +1718,7 @@ class PowerCostCard extends HTMLElement {
           ${this._config.show_details ? `
             <div class="rows">
               ${rows.map((row) => `
-                <div class="row ${this._isRowCollapsed(row) ? "collapsed" : ""} ${this._config.radio_mode ? `radio ${this._isRowCollapsed(row) ? "" : "open"}` : ""}">
+                <div class="row ${this._config.show_minimize && row.allowMinimize && this._collapsedCards[row.entityId] ? "collapsed" : ""}">
                   <div class="row-top">
                     <div class="row-title" data-more-info="${row.entityId}" title="פתח מידע נוסף">
                       <ha-icon
@@ -1972,13 +1731,13 @@ class PowerCostCard extends HTMLElement {
                       </div>
                     </div>
                     <div class="row-controls">
-                      ${(this._config.show_minimize || this._config.radio_mode) && row.allowMinimize ? `
-                        <button type="button" class="${this._config.radio_mode ? "radio-btn" : "collapse-btn"}" data-collapse-toggle="${row.entityId}">
-                          ${this._config.radio_mode ? (this._isRowCollapsed(row) ? "פתח" : "סגור") : (this._collapsedCards[row.entityId] ? "הצג" : "מזער")}
+                      ${this._config.show_minimize && row.allowMinimize ? `
+                        <button class="collapse-btn" data-collapse-toggle="${row.entityId}">
+                          ${this._collapsedCards[row.entityId] ? "הצג" : "מזער"}
                         </button>
                       ` : ""}
                       ${this._config.show_toggle ? `
-                        <div class="toggle-switch-wrap" data-toggle="${row.entityId}">
+                        <div class="toggle-switch-wrap">
                           <ha-switch
                             class="toggle-switch"
                             data-toggle="${row.entityId}"
@@ -1990,7 +1749,7 @@ class PowerCostCard extends HTMLElement {
                     </div>
                   </div>
 
-                  ${this._isRowCollapsed(row) ? "" : `
+                  ${this._config.show_minimize && row.allowMinimize && this._collapsedCards[row.entityId] ? "" : `
                     <div class="metrics">
                       <div class="metric">
                         <div class="label">זמן פעיל ${this._periodLabel(this._period)}</div>
