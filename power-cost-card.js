@@ -52,7 +52,12 @@ class PowerCostCardEditor extends HTMLElement {
         config.radio_mode = false;
       }
     } else if (isNumber) {
-      config[field] = rawValue === "" ? undefined : Number(rawValue);
+      const num = rawValue === "" ? undefined : Number(rawValue);
+      if (field === "background_opacity") {
+        config[field] = num == null || Number.isNaN(num) ? undefined : Math.max(0, Math.min(1, num));
+      } else {
+        config[field] = num;
+      }
     } else {
       config[field] = rawValue;
     }
@@ -75,6 +80,7 @@ class PowerCostCardEditor extends HTMLElement {
       allow_minimize: true,
       currency: this._config?.currency || "₪",
     });
+    this._entityEditorOpen = { ...(this._entityEditorOpen || {}), [entities.length - 1]: true };
     this._config = { ...(this._config || {}), entities };
     this._emitConfig(this._config);
     this._render();
@@ -83,6 +89,49 @@ class PowerCostCardEditor extends HTMLElement {
   _removeEntityRow(index) {
     const entities = this._getEntities();
     entities.splice(index, 1);
+
+    const nextOpen = {};
+    Object.keys(this._entityEditorOpen || {}).forEach((key) => {
+      const oldIndex = Number(key);
+      if (oldIndex === index) return;
+      const newIndex = oldIndex > index ? oldIndex - 1 : oldIndex;
+      nextOpen[newIndex] = this._entityEditorOpen[key];
+    });
+    this._entityEditorOpen = nextOpen;
+
+    this._saveEntities(entities);
+  }
+
+  _moveEntityRow(fromIndex, toIndex) {
+    const entities = this._getEntities();
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= entities.length ||
+      toIndex >= entities.length
+    ) {
+      return;
+    }
+
+    const [moved] = entities.splice(fromIndex, 1);
+    entities.splice(toIndex, 0, moved);
+
+    const remap = {};
+    entities.forEach((_, newIndex) => {
+      const sourceIndex =
+        newIndex === toIndex
+          ? fromIndex
+          : fromIndex < toIndex
+            ? (newIndex > fromIndex && newIndex <= toIndex ? newIndex - 1 : newIndex)
+            : (newIndex >= toIndex && newIndex < fromIndex ? newIndex + 1 : newIndex);
+
+      if (this._entityEditorOpen && sourceIndex in this._entityEditorOpen) {
+        remap[newIndex] = this._entityEditorOpen[sourceIndex];
+      }
+    });
+    this._entityEditorOpen = remap;
+
     this._saveEntities(entities);
   }
 
@@ -115,6 +164,126 @@ class PowerCostCardEditor extends HTMLElement {
 
     entities[index] = next;
     this._saveEntities(entities);
+  }
+
+
+
+  _iconDatalistOptions() {
+    const states = this._hass?.states || {};
+    const seen = new Set();
+    const icons = [];
+
+    const addIcon = (icon) => {
+      if (!icon || seen.has(icon) || !String(icon).startsWith("mdi:")) return;
+      seen.add(icon);
+      icons.push(icon);
+    };
+
+    Object.values(states).forEach((stateObj) => addIcon(stateObj?.attributes?.icon));
+
+    [
+      "mdi:lightbulb",
+      "mdi:lightbulb-on",
+      "mdi:ceiling-light",
+      "mdi:lamp",
+      "mdi:power-plug",
+      "mdi:power-socket-eu",
+      "mdi:radiator",
+      "mdi:fan",
+      "mdi:air-conditioner",
+      "mdi:flash",
+      "mdi:fire",
+      "mdi:water-boiler",
+      "mdi:microwave",
+      "mdi:kettle",
+      "mdi:television",
+      "mdi:desktop-classic",
+      "mdi:washing-machine",
+      "mdi:dishwasher",
+      "mdi:fridge-outline",
+      "mdi:oven",
+      "mdi:heater",
+      "mdi:coffee-maker-outline",
+      "mdi:hair-dryer",
+      "mdi:snowflake",
+      "mdi:air-purifier",
+      "mdi:toaster-oven",
+      "mdi:robot-vacuum"
+    ].forEach(addIcon);
+
+    return icons
+      .sort((a, b) => a.localeCompare(b))
+      .map((icon) => `<option value="${icon}">${icon}</option>`)
+      .join("");
+  }
+
+
+
+  _getAllIcons() {
+    const states = this._hass?.states || {};
+    const seen = new Set();
+    const icons = [];
+
+    const addIcon = (icon) => {
+      if (!icon || seen.has(icon) || !String(icon).startsWith("mdi:")) return;
+      seen.add(icon);
+      icons.push(icon);
+    };
+
+    Object.values(states).forEach((stateObj) => addIcon(stateObj?.attributes?.icon));
+
+    [
+      "mdi:lightbulb",
+      "mdi:lightbulb-on",
+      "mdi:ceiling-light",
+      "mdi:lamp",
+      "mdi:power-plug",
+      "mdi:power-socket-eu",
+      "mdi:radiator",
+      "mdi:fan",
+      "mdi:air-conditioner",
+      "mdi:flash",
+      "mdi:fire",
+      "mdi:water-boiler",
+      "mdi:microwave",
+      "mdi:kettle",
+      "mdi:television",
+      "mdi:desktop-classic",
+      "mdi:washing-machine",
+      "mdi:dishwasher",
+      "mdi:fridge-outline",
+      "mdi:oven",
+      "mdi:heater",
+      "mdi:coffee-maker-outline",
+      "mdi:hair-dryer",
+      "mdi:snowflake",
+      "mdi:air-purifier",
+      "mdi:toaster-oven",
+      "mdi:robot-vacuum",
+      "mdi:home",
+      "mdi:script-outline",
+      "mdi:cpu-64-bit",
+      "mdi:gesture-tap-button",
+      "mdi:lightbulb-group",
+      "mdi:lightbulb-group-outline",
+      "mdi:sine-wave",
+      "mdi:toaster-oven"
+    ].forEach(addIcon);
+
+    return icons.sort((a, b) => a.localeCompare(b));
+  }
+
+  _iconListOptions(selectedIcon) {
+    return this._getAllIcons()
+      .map((icon) => `
+        <button class="icon-list-option ${selectedIcon === icon ? "selected" : ""}" type="button" data-icon-select="${icon}">
+          <span class="icon-preview">
+            <ha-icon icon="${icon}"></ha-icon>
+          </span>
+          <span class="icon-list-option-text">${icon}</span>
+        </button>
+      `)
+      .join("");
   }
 
   _entityDatalistOptions(domains) {
@@ -225,11 +394,306 @@ class PowerCostCardEditor extends HTMLElement {
       .join("");
   }
 
+
+  _isSectionOpen(key) {
+    if (!this._editorSections) this._editorSections = {};
+    if (!(key in this._editorSections)) this._editorSections[key] = false;
+    return this._editorSections[key];
+  }
+
+  _toggleSection(key) {
+    this._editorSections = { ...(this._editorSections || {}), [key]: !this._isSectionOpen(key) };
+    this._render();
+  }
+
+  _isEntityEditorOpen(index) {
+    if (!this._entityEditorOpen) this._entityEditorOpen = {};
+    if (!(index in this._entityEditorOpen)) this._entityEditorOpen[index] = false;
+    return this._entityEditorOpen[index];
+  }
+
+  _toggleEntityEditor(index) {
+    this._entityEditorOpen = { ...(this._entityEditorOpen || {}), [index]: !this._isEntityEditorOpen(index) };
+    this._render();
+  }
+
+  _colorPickerValue(value) {
+    const v = String(value || "").trim().toLowerCase();
+    if (!v) return "#ffb300";
+    if (v === "white") return "#ffffff";
+    if (v === "black") return "#000000";
+    if (v.startsWith("#")) return v;
+    return "#ffb300";
+  }
+
+  _colorSelectValue(value) {
+    const current = String(value || "");
+    const presetValues = this._colorPresets().map(([preset]) => preset);
+    return presetValues.includes(current) ? current : "__custom__";
+  }
+
+  _colorSelectOptions(selectedColor) {
+    const glyphs = ["⚪", "🟡", "🟡", "🟠", "🟠", "🟢", "🟢", "🔵", "🔵", "🟣", "🟣", "🔴", "⚪"];
+    return this._colorPresets()
+      .map(([value], index) => `<option value="${value}" ${this._colorSelectValue(selectedColor) === value ? "selected" : ""}>${glyphs[index] || "●"}</option>`)
+      .join("") + `<option value="__custom__" ${this._colorSelectValue(selectedColor) === "__custom__" ? "selected" : ""}>🎨</option>`;
+  }
+
+  _entitySummary(row) {
+    const title = row?.name || row?.entity || "ישות חדשה";
+    const meta = [row?.entity || "", row?.power_entity || "", row?.power_w != null && row?.power_w !== "" ? `${row.power_w}W` : ""]
+      .filter(Boolean)
+      .join(" • ");
+    return { title, meta };
+  }
+
+
+
+  _defaultColorPalette() {
+    return ["#F44336", "#FF9800", "#FFC107", "#4CAF50", "#2196F3", "#9C27B0"];
+  }
+
+  _openColorPopup(index) {
+    this._activeColorPopupIndex = index;
+    this._render();
+  }
+
+  _closeColorPopup() {
+    this._activeColorPopupIndex = null;
+    this._render();
+  }
+
+
+  _isSafariMobile() {
+    const ua = navigator.userAgent || "";
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    const isSafari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
+    return isIOS && isSafari;
+  }
+
+  _hexToHue(hex) {
+    const value = String(hex || "").trim();
+    const match = /^#?([0-9a-fA-F]{6})$/.exec(value);
+    if (!match) return 210;
+    const n = match[1];
+    const r = parseInt(n.slice(0, 2), 16) / 255;
+    const g = parseInt(n.slice(2, 4), 16) / 255;
+    const b = parseInt(n.slice(4, 6), 16) / 255;
+    const maxv = Math.max(r, g, b);
+    const minv = Math.min(r, g, b);
+    const d = maxv - minv;
+    if (d === 0) return 0;
+    let h;
+    switch (maxv) {
+      case r: h = ((g - b) / d) % 6; break;
+      case g: h = (b - r) / d + 2; break;
+      default: h = (r - g) / d + 4; break;
+    }
+    return Math.round(h * 60 < 0 ? h * 60 + 360 : h * 60);
+  }
+
+  _hslToHex(h, s = 85, l = 56) {
+    const hh = (((Number(h) || 0) % 360) + 360) % 360;
+    const ss = Math.max(0, Math.min(100, Number(s))) / 100;
+    const ll = Math.max(0, Math.min(100, Number(l))) / 100;
+
+    const c = (1 - Math.abs(2 * ll - 1)) * ss;
+    const x = c * (1 - Math.abs((hh / 60) % 2 - 1));
+    const m = ll - c / 2;
+
+    let r = 0, g = 0, b = 0;
+    if (hh < 60) [r, g, b] = [c, x, 0];
+    else if (hh < 120) [r, g, b] = [x, c, 0];
+    else if (hh < 180) [r, g, b] = [0, c, x];
+    else if (hh < 240) [r, g, b] = [0, x, c];
+    else if (hh < 300) [r, g, b] = [x, 0, c];
+    else [r, g, b] = [c, 0, x];
+
+    const toHex = (v) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
   _render() {
     const config = this._config || {};
     const entities = this._getEntities();
     const mainEntityOptions = this._entityDatalistOptions(["light", "switch", "fan", "climate"]);
     const powerEntityOptions = this._entityDatalistOptions(["sensor"]);
+
+    const renderSection = (key, title, content) => `
+      <div class="editor-section">
+        <button class="section-header" type="button" data-section-toggle="${key}">
+          <span>${title}</span>
+          <span class="section-chevron">${this._isSectionOpen(key) ? "▾" : "▸"}</span>
+        </button>
+        ${this._isSectionOpen(key) ? `<div class="section-body">${content}</div>` : ""}
+      </div>
+    `;
+
+    const renderEntity = (row, index) => {
+      const summary = this._entitySummary(row);
+      const isOpen = this._isEntityEditorOpen(index);
+
+      return `
+        <div class="entity-row ${isOpen ? "open" : ""}" data-entity-row="${index}">
+          <div class="entity-header">
+            <button class="drag-handle" type="button" draggable="true" title="גרור לסידור" aria-label="גרור לסידור" data-drag-handle="${index}">⋮⋮</button>
+            <button class="entity-toggle" type="button" data-entity-toggle="${index}">
+              <span class="entity-header-main">
+                <span class="entity-mini-icon"><ha-icon icon="${row.icon || "mdi:flash"}"></ha-icon></span>
+                <span class="entity-texts">
+                  <span class="entity-name">${summary.title}</span>
+                  <span class="entity-meta">${summary.meta || "הגדרות ישות"}</span>
+                </span>
+              </span>
+              <span class="entity-toggle-right">${isOpen ? "▾" : "▸"}</span>
+            </button>
+          </div>
+
+          ${isOpen ? `
+            <div class="entity-body">
+              <div class="entity-actions-row">
+                <button class="btn danger delete-row-btn" type="button" data-delete-entity="${index}">מחק ישות</button>
+              </div>
+              <div class="entity-grid two-col">
+                <label>
+                  <span>Entity</span>
+                  <input
+                    data-row-field="entity"
+                    data-index="${index}"
+                    value="${row.entity || ""}"
+                    list="power-cost-entity-list"
+                    placeholder="בחר או כתוב entity"
+                    autocapitalize="off"
+                    autocorrect="off"
+                    spellcheck="false"
+                  >
+                </label>
+
+                <label>
+                  <span>שם להצגה</span>
+                  <input data-row-field="name" data-index="${index}" value="${row.name || ""}">
+                </label>
+              </div>
+
+              <div class="entity-grid two-col">
+                <label>
+                  <span>אייקון</span>
+                  <div class="icon-ha-picker-row">
+                    <span class="icon-preview">
+                      <ha-icon icon="${row.icon || 'mdi:flash'}"></ha-icon>
+                    </span>
+                    <ha-icon-picker
+                      data-icon-picker-native="${index}"
+                      placeholder="${row.icon || "mdi:icon-name"}"
+                    ></ha-icon-picker>
+                  </div>
+                </label>
+
+                <label>
+                  <span>צבע אייקון כשהישות דולקת</span>
+                  <div class="color-select-row" data-color-wrap="${index}">
+                    <button class="btn color-btn" type="button" data-open-color-popup="${index}" title="בחר צבע">
+                      <span class="color-btn-dot" style="background:${row.active_icon_color || "var(--card-background-color)"};"></span>
+                      <span>🎨</span>
+                    </button>
+                  </div>
+
+                  ${this._activeColorPopupIndex === index ? `
+                    <div class="color-popup" data-color-popup="${index}">
+                      <div class="color-popup-head">
+                        <div class="color-popup-title">בחר צבע</div>
+                        <button class="btn color-popup-close" type="button" data-close-color-popup="1">✕</button>
+                      </div>
+
+                      <div class="color-popup-palette">
+                        ${this._defaultColorPalette().map((color) => `
+                          <button
+                            class="color-circle ${row.active_icon_color === color ? "selected" : ""}"
+                            type="button"
+                            data-palette-color="${color}"
+                            data-palette-index="${index}"
+                            style="background:${color};"
+                            aria-label="${color}"
+                            title="${color}"
+                          ></button>
+                        `).join("")}
+                      </div>
+
+                      ${this._isSafariMobile() ? `
+                        <div class="color-popup-custom">
+                          <span>צבע מותאם אישית</span>
+                          <div class="safari-hue-wrap">
+                            <input
+                              class="safari-hue-slider"
+                              type="range"
+                              min="0"
+                              max="360"
+                              step="1"
+                              value="${this._hexToHue(row.active_icon_color || "#2196F3")}"
+                              data-safari-hue="${index}"
+                            >
+                            <span class="safari-hue-preview" data-safari-preview="${index}" style="background:${row.active_icon_color || "#2196F3"};"></span>
+                          </div>
+                        </div>
+                      ` : `
+                        <div class="color-popup-custom">
+                          <span>צבע מותאם אישית</span>
+                          <label class="btn color-btn color-btn-wrap" title="בחר צבע מותאם">
+                            <span class="color-btn-dot" style="background:${row.active_icon_color || "var(--card-background-color)"};"></span>
+                            <span>בחר צבע</span>
+                            <input class="native-color-input" type="color" data-color-picker="${index}" value="${this._colorPickerValue(row.active_icon_color || "")}">
+                          </label>
+                        </div>
+                      `}
+                    </div>
+                  ` : ""}
+                </label>
+              </div>
+
+              <div class="entity-grid four-col">
+                <label>
+                  <span>Power קבוע ב-W</span>
+                  <input data-row-field="power_w" data-index="${index}" type="number" step="0.1" value="${row.power_w ?? ""}">
+                </label>
+
+                <label>
+                  <span>Power entity</span>
+                  <input
+                    data-row-field="power_entity"
+                    data-index="${index}"
+                    value="${row.power_entity || ""}"
+                    list="power-cost-power-entity-list"
+                    placeholder="בחר או כתוב sensor"
+                    autocapitalize="off"
+                    autocorrect="off"
+                    spellcheck="false"
+                  >
+                </label>
+
+                <label>
+                  <span>מחיר לקוט"ש</span>
+                  <input data-row-field="price_per_kwh" data-index="${index}" type="number" step="0.001" value="${row.price_per_kwh ?? ""}">
+                </label>
+
+                <label>
+                  <span>מטבע</span>
+                  <input data-row-field="currency" data-index="${index}" value="${row.currency || config.currency || "₪"}">
+                </label>
+              </div>
+
+              <div class="entity-grid single-col">
+                <label class="checkbox-like">
+                  <input data-row-field="allow_minimize" data-index="${index}" type="checkbox" ${row.allow_minimize !== false ? "checked" : ""}>
+                  <span>אפשר מזעור לישות</span>
+                </label>
+              </div>
+
+              <div class="hint">בשדה הראשי מוצגים רק light / switch / fan / climate. בשדה Power entity מוצגים רק sensor.</div>
+            </div>
+          ` : ""}
+        </div>
+      `;
+    };
 
     this.innerHTML = `
       <style>
@@ -242,6 +706,7 @@ class PowerCostCardEditor extends HTMLElement {
           display: grid;
           gap: 6px;
           font-size: 14px;
+          min-width: 0;
         }
         input, select {
           font: inherit;
@@ -251,44 +716,7 @@ class PowerCostCardEditor extends HTMLElement {
           background: var(--card-background-color);
           color: var(--primary-text-color);
           min-width: 0;
-        }
-        .checks {
-          display: grid;
-          gap: 8px;
-        }
-        .checks label {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          line-height: 1.3;
-        }
-        .checks input[type="checkbox"] {
-          width: 18px;
-          height: 18px;
-          margin: 0;
-          flex: 0 0 auto;
-        }
-        .entity-rows {
-          display: grid;
-          gap: 12px;
-        }
-        .entity-row {
-          border: 1px solid var(--divider-color);
-          border-radius: 12px;
-          padding: 12px;
-          display: grid;
-          gap: 10px;
-        }
-        .entity-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 10px;
-        }
-        .row-actions {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 8px;
+          box-sizing: border-box;
         }
         .btn {
           font: inherit;
@@ -299,21 +727,230 @@ class PowerCostCardEditor extends HTMLElement {
           color: var(--primary-text-color);
           cursor: pointer;
         }
+        .btn.danger {
+          white-space: nowrap;
+          position: relative;
+          z-index: 3;
+          pointer-events: auto;
+        }
+        .entity-actions-row {
+          display: flex;
+          justify-content: flex-start;
+          margin-top: 2px;
+        }
+        .delete-row-btn {
+          min-width: 120px;
+          cursor: pointer;
+          pointer-events: auto;
+          user-select: none;
+        }
         .hint {
           font-size: 12px;
           opacity: 0.75;
           line-height: 1.4;
         }
         .editor-section {
+          border: 1px solid var(--divider-color);
+          border-radius: 14px;
+          overflow: hidden;
+          background: color-mix(in srgb, var(--card-background-color) 85%, transparent);
+        }
+        .section-header {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 12px 14px;
+          border: 0;
+          background: transparent;
+          color: var(--primary-text-color);
+          cursor: pointer;
+          font: inherit;
+          font-size: 15px;
+          font-weight: 700;
+          text-align: right;
+        }
+        .section-body {
+          display: grid;
+          gap: 12px;
+          padding: 0 14px 14px;
+        }
+        .compact-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+        .compact-grid.three {
+          grid-template-columns: 0.8fr 1.1fr 1fr;
+        }
+        .checks {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px 18px;
+        }
+        .checks label,
+        .checkbox-like {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          line-height: 1.3;
+          min-height: 24px;
+        }
+        
+        .checks input[type="checkbox"],
+        .checkbox-like input[type="checkbox"]{
+          -webkit-appearance:none;
+          appearance:none;
+          width:18px;
+          height:18px;
+          border-radius:50%;
+          border:2px solid #6fcf97;
+          background:transparent;
+          cursor:pointer;
+          position:relative;
+          transition:all .15s ease;
+        }
+
+        .checks input[type="checkbox"]:hover,
+        .checkbox-like input[type="checkbox"]:hover{
+          border-color:#4cd37a;
+        }
+
+        .checks input[type="checkbox"]:checked,
+        .checkbox-like input[type="checkbox"]:checked{
+          border-color:#4cd37a;
+        }
+
+        .checks input[type="checkbox"]:checked::after,
+        .checkbox-like input[type="checkbox"]:checked::after{
+          content:"";
+          position:absolute;
+          width:8px;
+          height:8px;
+          border-radius:50%;
+          background:#4cd37a;
+          top:50%;
+          left:50%;
+          transform:translate(-50%,-50%);
+        }
+
+        .entity-rows {
           display: grid;
           gap: 10px;
-          padding: 12px;
+        }
+        .entity-row {
           border: 1px solid var(--divider-color);
           border-radius: 12px;
+          overflow: hidden;
+          background: color-mix(in srgb, var(--card-background-color) 92%, transparent);
         }
-        .section-title {
+        .entity-row.open {
+          border-color: color-mix(in srgb, var(--primary-color) 24%, var(--divider-color));
+        }
+        .entity-header {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr);
+          align-items: center;
+          gap: 10px;
+          padding: 10px;
+        }
+        .drag-handle {
+          grid-column: 1;
+          width: 34px;
+          height: 34px;
+          border: 1px solid var(--divider-color);
+          border-radius: 10px;
+          background: transparent;
+          color: var(--primary-text-color);
+          cursor: grab;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 auto;
+          font-size: 18px;
+          position: relative;
+          z-index: 2;
+        }
+        .drag-handle:active {
+          cursor: grabbing;
+        }
+        .entity-row.dragging {
+          opacity: 0.45;
+        }
+        .entity-row.drop-target {
+          border-color: var(--primary-color);
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 20%, transparent) inset;
+        }
+        .entity-toggle {
+          grid-column: 2;
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          border: 0;
+          background: transparent;
+          color: var(--primary-text-color);
+          cursor: pointer;
+          padding: 0;
+          min-width: 0;
+          text-align: right;
+          font: inherit;
+        }
+        .entity-header-main {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+        }
+        .entity-mini-icon {
+          width: 34px;
+          height: 34px;
+          border: 1px solid var(--divider-color);
+          border-radius: 10px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 auto;
+        }
+        .entity-texts {
+          display: grid;
+          gap: 2px;
+          min-width: 0;
+        }
+        .entity-name {
           font-size: 14px;
           font-weight: 700;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .entity-meta {
+          font-size: 12px;
+          opacity: 0.7;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .entity-body {
+          display: grid;
+          gap: 12px;
+          padding: 0 10px 12px;
+          border-top: 1px solid color-mix(in srgb, var(--divider-color) 70%, transparent);
+        }
+        .entity-grid {
+          display: grid;
+          gap: 10px;
+        }
+        .entity-grid.two-col {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .entity-grid.four-col {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+        .entity-grid.single-col {
+          grid-template-columns: 1fr;
         }
         .icon-picker {
           position: relative;
@@ -375,7 +1012,6 @@ class PowerCostCardEditor extends HTMLElement {
         .icon-search {
           width: 100%;
           margin-bottom: 8px;
-          box-sizing: border-box;
         }
         .icon-grid {
           display: grid;
@@ -411,208 +1047,300 @@ class PowerCostCardEditor extends HTMLElement {
         .icon-picker-hidden-value {
           display: none;
         }
-        .color-field-wrap {
-          display: grid;
-          grid-template-columns: auto minmax(0, 1fr);
-          gap: 10px;
-          align-items: center;
-        }
-        .color-presets {
+        .color-select-row {
           display: flex;
           align-items: center;
           gap: 8px;
-          flex-wrap: wrap;
         }
-        .color-dot {
-          width: 26px;
-          height: 26px;
+        .color-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-width: auto;
+          padding-inline: 10px;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .color-btn-wrap {
+          cursor: pointer;
+        }
+        .color-btn-dot {
+          width: 16px;
+          height: 16px;
           border-radius: 999px;
           border: 2px solid var(--divider-color);
-          cursor: pointer;
-          padding: 0;
-          outline: none;
+          display: inline-block;
           box-sizing: border-box;
-          background: transparent;
-          position: relative;
         }
-        .color-dot.selected {
+        .native-color-input {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          opacity: 0;
+          cursor: pointer;
+          border: 0;
+          padding: 0;
+          margin: 0;
+        }
+        .color-popup {
+          margin-top: 10px;
+          border: 1px solid var(--divider-color);
+          border-radius: 12px;
+          padding: 12px;
+          display: grid;
+          gap: 12px;
+          background: var(--card-background-color);
+        }
+        .color-popup-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+        .color-popup-title {
+          font-weight: 700;
+          font-size: 14px;
+        }
+        .color-popup-close {
+          min-width: auto;
+          padding-inline: 10px;
+        }
+        .color-popup-palette {
+          display: grid;
+          grid-template-columns: repeat(3, 34px);
+          gap: 12px;
+          justify-content: start;
+        }
+
+        @media (max-width: 600px) {
+          .color-popup-palette {
+            grid-template-columns: repeat(3, 30px);
+            gap: 10px;
+          }
+        }
+        .color-circle {
+          width: 30px;
+          height: 30px;
+          border-radius: 999px;
+          border: 2px solid var(--divider-color);
+          padding: 0;
+          cursor: pointer;
+          box-sizing: border-box;
+        }
+        .color-circle.selected {
           border-color: var(--primary-color);
           transform: scale(1.08);
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 20%, transparent);
         }
-        .color-dot.custom {
-          background:
-            linear-gradient(45deg, #ff5252 0 25%, #ffd54f 25% 50%, #00c853 50% 75%, #2979ff 75% 100%);
+        .color-popup-custom {
+          display: grid;
+          gap: 8px;
+          align-items: start;
+        }
+        .safari-hue-wrap {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 34px;
+          gap: 10px;
+          align-items: center;
+        }
+        .safari-hue-slider {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 100%;
+          height: 18px;
+          border-radius: 999px;
+          border: 1px solid var(--divider-color);
+          background: linear-gradient(90deg,
+            #ff0000 0%,
+            #ffff00 17%,
+            #00ff00 33%,
+            #00ffff 50%,
+            #0000ff 67%,
+            #ff00ff 83%,
+            #ff0000 100%);
+          outline: none;
+        }
+        .safari-hue-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 22px;
+          height: 22px;
+          border-radius: 999px;
+          background: white;
+          border: 2px solid rgba(0,0,0,0.18);
+          box-shadow: 0 1px 6px rgba(0,0,0,0.25);
+        }
+        .safari-hue-preview {
+          width: 30px;
+          height: 30px;
+          border-radius: 999px;
+          border: 2px solid var(--divider-color);
+          display: inline-block;
+          box-sizing: border-box;
+        }
+        .entity-list-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+        @media (max-width: 900px) {
+          .entity-grid.four-col,
+          .compact-grid.three {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+        @media (max-width: 640px) {
+          .compact-grid,
+          .checks,
+          .entity-grid.two-col,
+          .entity-grid.four-col {
+            grid-template-columns: 1fr;
+          }
         }
       </style>
+
       <div class="wrap">
-        <label>
-          <span>כותרת</span>
-          <input data-field="title" value="${config.title || ""}">
-        </label>
-
-        <div class="editor-section">
-          <div class="section-title">רקע הכרטיס</div>
-
-          <label>
-            <span>נתיב תמונת רקע</span>
-            <input data-field="background_image" placeholder="/media/local/power_bg.jpg" value="${config.background_image || ""}">
-          </label>
-
-          <label>
-            <span>שקיפות תמונה (0.18 או 18)</span>
-            <input data-field="background_opacity" type="number" min="0" max="100" step="0.01" value="${config.background_opacity ?? 0.18}">
-          </label>
-
-          <label>
-            <span>טשטוש תמונה (px)</span>
-            <input data-field="background_blur" type="number" min="0" max="8" step="1" value="${config.background_blur ?? 0}">
-          </label>
-
-          <label>
-            <span>גודל תמונה</span>
-            <select data-field="background_size">
-              <option value="cover" ${config.background_size === "cover" || !config.background_size ? "selected" : ""}>Cover / מילוי</option>
-              <option value="contain" ${config.background_size === "contain" ? "selected" : ""}>Contain / התאמה</option>
-              <option value="auto" ${config.background_size === "auto" ? "selected" : ""}>Auto</option>
-            </select>
-          </label>
-        </div>
-
-        <label>
-          <span>מטבע ברירת מחדל</span>
-          <input data-field="currency" value="${config.currency || "₪"}">
-        </label>
-
-        <label>
-          <span>מחיר ברירת מחדל לקוט"ש</span>
-          <input data-field="default_price_per_kwh" type="number" step="0.001" value="${config.default_price_per_kwh ?? ""}">
-        </label>
-
-        <label>
-          <span>רענון בשניות</span>
-          <input data-field="refresh_seconds" type="number" min="10" step="1" value="${config.refresh_seconds ?? 60}">
-        </label>
-
-        <div class="checks">
-          <label><input data-field="show_period_selector" type="checkbox" ${config.show_period_selector !== false ? "checked" : ""}> בורר תקופה</label>
-          <label><input data-field="show_toggle" type="checkbox" ${config.show_toggle !== false ? "checked" : ""}> טוגל הפעלה/כיבוי</label>
-          <label><input data-field="show_total" type="checkbox" ${config.show_total !== false ? "checked" : ""}> סיכום כולל</label>
-          <label><input data-field="show_details" type="checkbox" ${config.show_details !== false ? "checked" : ""}> טבלת ישויות</label>
-          <label><input data-field="show_formula" type="checkbox" ${config.show_formula !== false ? "checked" : ""}> הצג נוסחת חישוב</label>
-          <label><input data-field="show_graph" type="checkbox" ${config.show_graph === true ? "checked" : ""}> הצג גרף בכרטיס</label>
-          <label><input data-field="show_minimize" type="checkbox" ${config.show_minimize !== false ? "checked" : ""}> אפשר מזעור כרטיסים</label>
-          <label><input data-field="radio_mode" type="checkbox" ${config.radio_mode === true ? "checked" : ""}> מצב רדיו</label>
-          <label><input data-field="enable_icon_animation" type="checkbox" ${config.enable_icon_animation !== false ? "checked" : ""}> אפשר אנימציית אייקון</label>
-        </div>
-
-        <div>
-          <span>ישויות</span>
-          <div class="entity-rows">
-            ${entities.map((row, index) => `
-              <div class="entity-row">
-                <div class="entity-grid">
-                  <label>
-                    <span>Entity</span>
-                    <input
-                      data-row-field="entity"
-                      data-index="${index}"
-                      value="${row.entity || ""}"
-                      list="power-cost-entity-list"
-                      placeholder="בחר או כתוב entity"
-                      autocapitalize="off"
-                      autocorrect="off"
-                      spellcheck="false"
-                    >
-                  </label>
-
-                  <label>
-                    <span>שם להצגה</span>
-                    <input data-row-field="name" data-index="${index}" value="${row.name || ""}">
-                  </label>
-
-                  <label>
-                    <span>אייקון</span>
-                    <div class="icon-picker" data-icon-picker data-index="${index}">
-                      <input class="icon-picker-hidden-value" data-row-field="icon" data-index="${index}" value="${row.icon || ""}">
-                      <button class="icon-picker-button" type="button" data-icon-toggle="${index}">
-                        <span class="icon-picker-button-main">
-                          <span class="icon-preview">
-                            <ha-icon icon="${row.icon || 'mdi:flash'}"></ha-icon>
-                          </span>
-                          <span class="icon-picker-label">${this._iconButtonLabel(row.icon || "")}</span>
-                        </span>
-                        <span>▾</span>
-                      </button>
-                      <div class="icon-picker-menu">
-                        <input class="icon-search" type="text" placeholder="חפש אייקון..." data-icon-search="${index}">
-                        <div class="icon-grid">
-                          <button class="icon-option ${!row.icon ? "selected" : ""}" type="button" data-icon-select="">
-                            <ha-icon icon="mdi:flash"></ha-icon>
-                            <span class="icon-option-name">ברירת מחדל</span>
-                          </button>
-                          ${this._iconGridOptions(row.icon || "")}
-                        </div>
-                      </div>
-                    </div>
-                  </label>
-
-                  <label>
-                    <span>צבע אייקון כשהישות דולקת</span>
-                    <div class="color-field-wrap">
-                      <div class="color-presets">
-                        ${this._colorPresetDots(row.active_icon_color || "", index)}
-                        <button class="color-dot custom ${(!this._colorPresets().some(([value]) => value === (row.active_icon_color || "")) && (row.active_icon_color || "")) ? "selected" : ""}" type="button" data-color-dot="${index}" data-color-custom="1" title="צבע מותאם אישית" aria-label="צבע מותאם אישית"></button>
-                      </div>
-                      <input data-row-field="active_icon_color" data-index="${index}" value="${row.active_icon_color || ""}" placeholder="לדוגמה: #ffb300 או orange">
-                    </div>
-                  </label>
-
-                  <label>
-                    <span>אפשר מזעור לישות</span>
-                    <input data-row-field="allow_minimize" data-index="${index}" type="checkbox" ${row.allow_minimize !== false ? "checked" : ""}>
-                  </label>
-
-                  <label>
-                    <span>Power קבוע ב-W</span>
-                    <input data-row-field="power_w" data-index="${index}" type="number" step="0.1" value="${row.power_w ?? ""}">
-                  </label>
-
-                  <label>
-                    <span>Power entity</span>
-                    <input
-                      data-row-field="power_entity"
-                      data-index="${index}"
-                      value="${row.power_entity || ""}"
-                      list="power-cost-power-entity-list"
-                      placeholder="בחר או כתוב sensor"
-                      autocapitalize="off"
-                      autocorrect="off"
-                      spellcheck="false"
-                    >
-                  </label>
-
-                  <label>
-                    <span>מחיר לקוט"ש</span>
-                    <input data-row-field="price_per_kwh" data-index="${index}" type="number" step="0.001" value="${row.price_per_kwh ?? ""}">
-                  </label>
-
-                  <label>
-                    <span>מטבע</span>
-                    <input data-row-field="currency" data-index="${index}" value="${row.currency || config.currency || "₪"}">
-                  </label>
-                </div>
-
-                <div class="row-actions">
-                  <div class="hint">בשדה הראשי מוצגים רק light / switch / fan / climate. בשדה power_entity מוצגים רק sensor.</div>
-                  <button class="btn" type="button" data-remove-index="${index}">מחק שורה</button>
-                </div>
-              </div>
-            `).join("")}
+        ${renderSection("general", "הגדרות כלליות", `
+          <div class="compact-grid three">
+            <label>
+              <span>כותרת</span>
+              <input data-field="title" value="${config.title || ""}">
+            </label>
+            <label>
+              <span>מטבע ברירת מחדל</span>
+              <input data-field="currency" value="${config.currency || "₪"}">
+            </label>
+            <label>
+              <span>מחיר ברירת מחדל לקוט"ש</span>
+              <input data-field="default_price_per_kwh" type="number" step="0.001" value="${config.default_price_per_kwh ?? ""}">
+            </label>
           </div>
-          <div style="margin-top: 10px;">
+          <div class="compact-grid">
+            <label>
+              <span>רענון בשניות</span>
+              <input data-field="refresh_seconds" type="number" min="10" step="1" value="${config.refresh_seconds ?? 60}">
+            </label>
+          </div>
+        `)}
+
+        ${renderSection("display", "תצוגה והתנהגות", `
+          <div class="checks">
+            <label><input data-field="show_period_selector" type="checkbox" ${config.show_period_selector !== false ? "checked" : ""}> בורר תקופה</label>
+            <label><input data-field="show_toggle" type="checkbox" ${config.show_toggle !== false ? "checked" : ""}> טוגל הפעלה/כיבוי</label>
+            <label><input data-field="show_total" type="checkbox" ${config.show_total !== false ? "checked" : ""}> סיכום כולל</label>
+            <label><input data-field="show_details" type="checkbox" ${config.show_details !== false ? "checked" : ""}> טבלת ישויות</label>
+            <label><input data-field="show_formula" type="checkbox" ${config.show_formula !== false ? "checked" : ""}> הצג נוסחת חישוב</label>
+            <label><input data-field="show_graph" type="checkbox" ${config.show_graph === true ? "checked" : ""}> הצג גרף בכרטיס</label>
+            <label><input data-field="show_minimize" type="checkbox" ${config.show_minimize !== false ? "checked" : ""}> אפשר מזעור כרטיסים</label>
+            <label><input data-field="radio_mode" type="checkbox" ${config.radio_mode === true ? "checked" : ""}> מצב רדיו</label>
+            <label><input data-field="enable_icon_animation" type="checkbox" ${config.enable_icon_animation !== false ? "checked" : ""}> אפשר אנימציית אייקון</label>
+          </div>
+        `)}
+
+        ${renderSection("background", "עיצוב ורקע", `
+          <div class="compact-grid">
+            <label>
+              <span>נתיב תמונת רקע</span>
+              <input data-field="background_image" placeholder="/media/local/power_bg.jpg" value="${config.background_image || ""}">
+            </label>
+            <label>
+              <span>גודל תמונה</span>
+              <select data-field="background_size">
+                <option value="cover" ${config.background_size === "cover" || !config.background_size ? "selected" : ""}>Cover / מילוי</option>
+                <option value="contain" ${config.background_size === "contain" ? "selected" : ""}>Contain / התאמה</option>
+                <option value="auto" ${config.background_size === "auto" ? "selected" : ""}>Auto</option>
+              </select>
+            </label>
+          </div>
+          <div class="compact-grid">
+            <label>
+              <span>שקיפות תמונה (0 עד 1)</span>
+              <input data-field="background_opacity" type="number" min="0" max="1" step="0.01" value="${config.background_opacity ?? 0.18}">
+            </label>
+          </div>
+        `)}
+
+        ${renderSection("pricing", "מצב תמחור", `
+          <div class="compact-grid">
+            <label>
+              <span>שיטת חישוב עלות</span>
+              <select data-field="pricing_mode">
+                <option value="consumption_only" ${config.pricing_mode === "consumption_only" || !config.pricing_mode ? "selected" : ""}>עלות צריכה בלבד</option>
+                <option value="energy_plus_fixed" ${config.pricing_mode === "energy_plus_fixed" ? "selected" : ""}>עלות צריכה + תשלום קבוע</option>
+                <option value="israel_tariff" ${config.pricing_mode === "israel_tariff" ? "selected" : ""}>תעו"ז ישראלי</option>
+                <option value="israel_tariff_plus_fixed" ${config.pricing_mode === "israel_tariff_plus_fixed" ? "selected" : ""}>תעו"ז ישראלי + תשלום קבוע</option>
+              </select>
+            </label>
+            <div></div>
+          </div>
+
+          <div class="compact-grid three">
+            <label>
+              <span>סכום תשלום קבוע</span>
+              <input data-field="fixed_charge_amount" type="number" step="0.01" value="${config.fixed_charge_amount ?? 0}">
+            </label>
+            <label>
+              <span>מחזור תשלום קבוע</span>
+              <select data-field="fixed_charge_period">
+                <option value="monthly" ${config.fixed_charge_period === "monthly" || !config.fixed_charge_period ? "selected" : ""}>חודשי</option>
+                <option value="bimonthly" ${config.fixed_charge_period === "bimonthly" ? "selected" : ""}>דו חודשי</option>
+              </select>
+            </label>
+            <label>
+              <span>חלוקת תשלום קבוע</span>
+              <select data-field="fixed_charge_allocation">
+                <option value="proportional" ${config.fixed_charge_allocation === "proportional" || !config.fixed_charge_allocation ? "selected" : ""}>יחסי לצריכה</option>
+                <option value="equal" ${config.fixed_charge_allocation === "equal" ? "selected" : ""}>חלוקה שווה</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="compact-grid">
+            <label>
+              <span>קיץ - שפל (₪/kWh)</span>
+              <input data-field="tariff_israel_shfel" type="number" step="0.0001" value="${config.tariff_israel_shfel ?? 0.49}">
+            </label>
+            <label>
+              <span>חורף - שפל (₪/kWh)</span>
+              <input data-field="tariff_israel_shfel_winter" type="number" step="0.0001" value="${config.tariff_israel_shfel_winter ?? 0.4226}">
+            </label>
+          </div>
+          <div class="compact-grid">
+            <label>
+              <span>קיץ - פסגה (₪/kWh)</span>
+              <input data-field="tariff_israel_peak" type="number" step="0.0001" value="${config.tariff_israel_peak ?? 1.6627}">
+            </label>
+            <label>
+              <span>חורף - פסגה (₪/kWh)</span>
+              <input data-field="tariff_israel_peak_winter" type="number" step="0.0001" value="${config.tariff_israel_peak_winter ?? 1.1654}">
+            </label>
+          </div>
+          <div class="compact-grid">
+            <label>
+              <span>קיץ - אביב/סתיו (₪/kWh)</span>
+              <input data-field="tariff_israel_offpeak" type="number" step="0.0001" value="${config.tariff_israel_offpeak ?? 0.4125}">
+            </label>
+            <label>
+              <span>חורף - אביב/סתיו (₪/kWh)</span>
+              <input data-field="tariff_israel_offpeak_winter" type="number" step="0.0001" value="${config.tariff_israel_offpeak_winter ?? 0.4634}">
+            </label>
+          </div>
+
+          <div class="hint">אם אתה משתמש בתמחור פשוט, אפשר להשאיר את שדות תעו"ז כמו שהם. הם ישפיעו רק במצבי התמחור הישראליים.</div>
+        `)}
+
+        ${renderSection("entities", "ניהול ישויות", `
+          <div class="entity-list-head">
+            <span class="hint">אפשר לבחור מהרשימה או לכתוב entity ידנית. ניתן גם לגרור ישויות כדי לשנות את הסדר שלהן. בחירת האייקון משתמשת בבורר האייקונים של Home Assistant ומציגה את האייקון לפני הבחירה.</span>
             <button class="btn" type="button" data-add-entity="1">הוסף ישות</button>
           </div>
-        </div>
+          <div class="entity-rows">
+            ${entities.map((row, index) => renderEntity(row, index)).join("")}
+          </div>
+        `)}
 
         <datalist id="power-cost-entity-list">
           ${mainEntityOptions}
@@ -622,17 +1350,28 @@ class PowerCostCardEditor extends HTMLElement {
           ${powerEntityOptions}
         </datalist>
 
-        <div class="hint">
-          אפשר לבחור מהרשימה או לכתוב entity ידנית. בשדה הראשי מומלץ להשתמש ב־light / switch / fan / climate, ובשדה power_entity ב־sensor.
-        </div>
       </div>
     `;
+
+    this.querySelectorAll("[data-section-toggle]").forEach((el) => {
+      el.addEventListener("click", () => this._toggleSection(el.dataset.sectionToggle));
+    });
+
+    this.querySelectorAll("[data-entity-toggle]").forEach((el) => {
+      el.addEventListener("click", () => this._toggleEntityEditor(Number(el.dataset.entityToggle)));
+    });
+    this.querySelectorAll("button").forEach((el) => {
+      if (!el.hasAttribute("data-drag-handle")) {
+        el.setAttribute("draggable", "false");
+      }
+    });
+
 
     this.querySelectorAll("[data-field]").forEach((el) => {
       const field = el.dataset.field;
       if (el.type === "checkbox") {
         el.addEventListener("change", (ev) => this._updateTopField(field, ev.target.checked, true, false));
-      } else if (["refresh_seconds", "default_price_per_kwh", "background_opacity", "background_blur"].includes(field)) {
+      } else if (["refresh_seconds", "default_price_per_kwh", "background_opacity", "fixed_charge_amount", "tariff_israel_shfel", "tariff_israel_shfel_winter", "tariff_israel_peak", "tariff_israel_peak_winter", "tariff_israel_offpeak", "tariff_israel_offpeak_winter"].includes(field)) {
         el.addEventListener("change", (ev) => this._updateTopField(field, ev.target.value, false, true));
       } else {
         el.addEventListener("change", (ev) => this._updateTopField(field, ev.target.value, false, false));
@@ -643,8 +1382,47 @@ class PowerCostCardEditor extends HTMLElement {
       el.addEventListener("click", () => this._addEntityRow());
     });
 
-    this.querySelectorAll("[data-remove-index]").forEach((el) => {
-      el.addEventListener("click", () => this._removeEntityRow(Number(el.dataset.removeIndex)));
+    let dragFromIndex = null;
+
+    this.querySelectorAll("[data-drag-handle]").forEach((handleEl) => {
+      handleEl.addEventListener("dragstart", (ev) => {
+        const rowEl = handleEl.closest("[data-entity-row]");
+        dragFromIndex = Number(rowEl?.dataset.entityRow);
+        rowEl?.classList.add("dragging");
+        ev.dataTransfer.effectAllowed = "move";
+        try {
+          ev.dataTransfer.setData("text/plain", String(dragFromIndex));
+        } catch (err) {}
+      });
+
+      handleEl.addEventListener("dragend", () => {
+        const rowEl = handleEl.closest("[data-entity-row]");
+        rowEl?.classList.remove("dragging");
+        this.querySelectorAll("[data-entity-row]").forEach((el) => el.classList.remove("drop-target"));
+      });
+    });
+
+    this.querySelectorAll("[data-entity-row]").forEach((rowEl) => {
+      rowEl.addEventListener("dragover", (ev) => {
+        ev.preventDefault();
+        rowEl.classList.add("drop-target");
+        ev.dataTransfer.dropEffect = "move";
+      });
+
+      rowEl.addEventListener("dragleave", () => {
+        rowEl.classList.remove("drop-target");
+      });
+
+      rowEl.addEventListener("drop", (ev) => {
+        ev.preventDefault();
+        rowEl.classList.remove("drop-target");
+        const toIndex = Number(rowEl.dataset.entityRow);
+        const fromIndex = dragFromIndex ?? Number(ev.dataTransfer.getData("text/plain"));
+        if (Number.isFinite(fromIndex) && Number.isFinite(toIndex)) {
+          this._moveEntityRow(fromIndex, toIndex);
+        }
+        dragFromIndex = null;
+      });
     });
 
     this.querySelectorAll("[data-row-field]").forEach((el) => {
@@ -664,18 +1442,189 @@ class PowerCostCardEditor extends HTMLElement {
       });
     });
 
-    this.querySelectorAll("[data-color-dot]").forEach((el) => {
+    this.querySelectorAll("[data-delete-entity]").forEach((el) => {
       el.addEventListener("click", (ev) => {
         ev.preventDefault();
-        const index = Number(ev.currentTarget.dataset.colorDot);
-        if (ev.currentTarget.dataset.colorCustom === "1") {
-          const input = this.querySelector(`[data-row-field="active_icon_color"][data-index="${index}"]`);
-          input?.focus();
-          input?.select?.();
+        ev.stopPropagation();
+        const index = Number(ev.currentTarget.dataset.deleteEntity);
+        if (Number.isFinite(index)) {
+          this._removeEntityRow(index);
+        }
+      });
+    });
+
+    this.querySelectorAll("[data-color-select]").forEach((el) => {
+      ["click", "mousedown", "pointerdown", "touchstart"].forEach((eventName) => {
+        el.addEventListener(eventName, (ev) => {
+          ev.stopPropagation();
+        }, { passive: false });
+      });
+
+      el.addEventListener("change", (ev) => {
+        ev.stopPropagation();
+        const index = Number(ev.currentTarget.dataset.colorSelect);
+        const value = ev.currentTarget.value || "";
+        if (value === "__custom__") {
+          this.querySelector(`[data-color-picker="${index}"]`)?.click();
           return;
         }
-        const value = ev.currentTarget.dataset.colorValue || "";
         this._updateEntityRow(index, "active_icon_color", value);
+      });
+    });
+
+
+    this.querySelectorAll("[data-color-picker]").forEach((el) => {
+      ["click", "mousedown", "pointerdown", "touchstart", "touchend"].forEach((eventName) => {
+        el.addEventListener(eventName, (ev) => {
+          ev.stopPropagation();
+        }, { passive: false });
+      });
+
+      el.addEventListener("input", (ev) => {
+        ev.stopPropagation();
+      });
+
+      el.addEventListener("change", (ev) => {
+        ev.stopPropagation();
+        const index = Number(ev.currentTarget.dataset.colorPicker);
+        const value = ev.currentTarget.value || "";
+        this._updateEntityRow(index, "active_icon_color", value);
+        this._activeColorPopupIndex = index;
+      });
+    });
+
+    this.querySelectorAll("[data-color-wrap]").forEach((el) => {
+      ["click", "mousedown", "pointerdown", "touchstart"].forEach((eventName) => {
+        el.addEventListener(eventName, (ev) => {
+          ev.stopPropagation();
+        }, { passive: false });
+      });
+    });
+
+
+
+    this.querySelectorAll("[data-icon-toggle]").forEach((el) => {
+      el.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const index = Number(ev.currentTarget.dataset.iconToggle);
+        this._activeIconPickerIndex = this._activeIconPickerIndex === index ? null : index;
+        this._render();
+      });
+    });
+
+    this.querySelectorAll("[data-icon-select]").forEach((el) => {
+      el.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const picker = ev.currentTarget.closest("[data-icon-picker]");
+        const index = Number(picker?.dataset.iconPicker);
+        const value = ev.currentTarget.dataset.iconSelect || "";
+        this._updateEntityRow(index, "icon", value);
+        this._activeIconPickerIndex = index;
+      });
+    });
+
+    this.querySelectorAll("[data-icon-search]").forEach((el) => {
+      el.addEventListener("input", (ev) => {
+        ev.stopPropagation();
+        const query = String(ev.currentTarget.value || "").toLowerCase().trim();
+        const menu = ev.currentTarget.closest("[data-icon-menu]");
+        menu?.querySelectorAll("[data-icon-select]").forEach((btn) => {
+          const value = String(btn.dataset.iconSelect || "").toLowerCase();
+          const text = String(btn.textContent || "").toLowerCase();
+          btn.style.display = (!query || value.includes(query) || text.includes(query)) ? "" : "none";
+        });
+      });
+    });
+
+
+    this.querySelectorAll("[data-icon-picker-native]").forEach((el) => {
+      const index = Number(el.dataset.iconPickerNative);
+      const currentValue = entities[index]?.icon || "";
+
+      try {
+        if (currentValue) {
+          el.selectedItem = { value: currentValue, label: currentValue };
+        }
+      } catch (err) {}
+
+      const update = (value) => {
+        const nextValue = String(value || "");
+        if (!nextValue) return;
+        this._updateEntityRow(index, "icon", nextValue);
+      };
+
+      el.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        update(ev.detail?.value ?? ev.detail?.icon ?? ev.target?.value ?? "");
+      });
+
+      el.addEventListener("change", (ev) => {
+        ev.stopPropagation();
+        update(ev.detail?.value ?? ev.detail?.icon ?? ev.target?.value ?? "");
+      });
+
+      el.addEventListener("closed", (ev) => {
+        ev.stopPropagation();
+        const picked = ev.detail?.value ?? ev.detail?.icon ?? ev.target?.value ?? "";
+        update(picked);
+      });
+    });
+
+    this.querySelectorAll("[data-open-color-popup]").forEach((el) => {
+      el.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this._openColorPopup(Number(ev.currentTarget.dataset.openColorPopup));
+      });
+    });
+
+    this.querySelectorAll("[data-close-color-popup]").forEach((el) => {
+      el.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this._closeColorPopup();
+      });
+    });
+
+    this.querySelectorAll("[data-palette-color]").forEach((el) => {
+      el.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const index = Number(ev.currentTarget.dataset.paletteIndex);
+        const color = ev.currentTarget.dataset.paletteColor || "";
+        this._updateEntityRow(index, "active_icon_color", color);
+        this._activeColorPopupIndex = index;
+      });
+    });
+
+
+    this.querySelectorAll("[data-safari-hue]").forEach((el) => {
+      ["click", "mousedown", "pointerdown", "touchstart", "touchmove", "touchend"].forEach((eventName) => {
+        el.addEventListener(eventName, (ev) => {
+          ev.stopPropagation();
+        }, { passive: false });
+      });
+
+      el.addEventListener("input", (ev) => {
+        ev.stopPropagation();
+        const index = Number(ev.currentTarget.dataset.safariHue);
+        const color = this._hslToHex(ev.currentTarget.value, 85, 56);
+
+        const preview = this.querySelector(`.safari-hue-preview[data-safari-preview="${index}"]`);
+        if (preview) preview.style.background = color;
+
+        const dot = this.querySelector(`[data-open-color-popup="${index}"] .color-btn-dot`);
+        if (dot) dot.style.background = color;
+      });
+
+      el.addEventListener("change", (ev) => {
+        ev.stopPropagation();
+        const index = Number(ev.currentTarget.dataset.safariHue);
+        const color = this._hslToHex(ev.currentTarget.value, 85, 56);
+        this._updateEntityRow(index, "active_icon_color", color);
+        this._activeColorPopupIndex = index;
       });
     });
 
@@ -718,6 +1667,7 @@ class PowerCostCardEditor extends HTMLElement {
       this.querySelectorAll("[data-icon-picker]").forEach((p) => p.classList.remove("open"));
     }, { once: true });
   }
+
 }
 
 class PowerCostCard extends HTMLElement {
@@ -748,8 +1698,17 @@ class PowerCostCard extends HTMLElement {
       title: "עלות צריכת חשמל",
       background_image: "",
       background_opacity: 0.18,
-      background_blur: 0,
       background_size: "cover",
+      pricing_mode: "consumption_only",
+      fixed_charge_amount: 0,
+      fixed_charge_period: "monthly",
+      fixed_charge_allocation: "proportional",
+      tariff_israel_shfel: 0.49,
+      tariff_israel_shfel_winter: 0.4226,
+      tariff_israel_peak: 1.6627,
+      tariff_israel_peak_winter: 1.1654,
+      tariff_israel_offpeak: 0.4125,
+      tariff_israel_offpeak_winter: 0.4634,
       currency: "₪",
       default_price_per_kwh: 0.52,
       refresh_seconds: 60,
@@ -882,8 +1841,17 @@ class PowerCostCard extends HTMLElement {
       title: config.title || "עלות צריכת חשמל",
       background_image: config.background_image || "",
       background_opacity: config.background_opacity ?? 0.18,
-      background_blur: config.background_blur ?? 0,
       background_size: config.background_size || "cover",
+      pricing_mode: config.pricing_mode || "consumption_only",
+      fixed_charge_amount: config.fixed_charge_amount ?? 0,
+      fixed_charge_period: config.fixed_charge_period || "monthly",
+      fixed_charge_allocation: config.fixed_charge_allocation || "proportional",
+      tariff_israel_shfel: config.tariff_israel_shfel ?? 0.49,
+      tariff_israel_shfel_winter: config.tariff_israel_shfel_winter ?? 0.4226,
+      tariff_israel_peak: config.tariff_israel_peak ?? 1.6627,
+      tariff_israel_peak_winter: config.tariff_israel_peak_winter ?? 1.1654,
+      tariff_israel_offpeak: config.tariff_israel_offpeak ?? 0.4125,
+      tariff_israel_offpeak_winter: config.tariff_israel_offpeak_winter ?? 0.4634,
       currency: config.currency || "₪",
       default_price_per_kwh:
         config.default_price_per_kwh != null ? Number(config.default_price_per_kwh) : undefined,
@@ -907,12 +1875,14 @@ class PowerCostCard extends HTMLElement {
   connectedCallback() {
     this.shadowRoot.addEventListener("click", this._boundClick);
     this.shadowRoot.addEventListener("change", this._boundChange);
+    this.shadowRoot.addEventListener("value-changed", this._boundChange);
     this._startTimer();
   }
 
   disconnectedCallback() {
     this.shadowRoot.removeEventListener("click", this._boundClick);
     this.shadowRoot.removeEventListener("change", this._boundChange);
+    this.shadowRoot.removeEventListener("value-changed", this._boundChange);
     if (this._interval) clearInterval(this._interval);
     this._interval = null;
   }
@@ -1511,7 +2481,7 @@ class PowerCostCard extends HTMLElement {
     const anyError = rows.some((row) => row.error);
     const bgImage = this._resolveBackgroundImage();
     const bgOpacity = this._normalizeBackgroundOpacity(this._config?.background_opacity);
-    const bgBlur = Math.max(0, Math.min(8, Number(this._config?.background_blur || 0)));
+    const bgBlur = Math.max(0, Math.min(8, Number(this._config?.background_blur_removed || 0)));
     const bgSize = this._config?.background_size || "cover";
     const bgFilter = bgBlur > 0 ? `filter: blur(${bgBlur}px);` : "";
 
@@ -1780,6 +2750,8 @@ class PowerCostCard extends HTMLElement {
           border: 1px solid var(--divider-color);
           border-radius: 14px;
           padding: 10px;
+          box-sizing: border-box;
+          min-width: 0;
         }
 
         .metric .v {
@@ -1789,12 +2761,22 @@ class PowerCostCard extends HTMLElement {
 
         .bottom-row {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) 220px;
-          gap: 12px;
+          direction: ltr;
+          grid-template-columns: minmax(0, calc(100% - 244px)) 220px;
+          gap: 24px;
           align-items: stretch;
         }
 
+        .bottom-row > * {
+          direction: rtl;
+        }
+
         .graph-box {
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          overflow: hidden;
+          box-sizing: border-box;
           border: 1px solid var(--divider-color);
           border-radius: 18px;
           padding: 12px 14px 10px;
@@ -1874,13 +2856,26 @@ class PowerCostCard extends HTMLElement {
 
         .premium-graph {
           width: 100%;
+          max-width: 100%;
+          min-width: 0;
           height: 108px;
           display: block;
         }
 
         .metric-cost {
-          width: 220px;
+          width: minmax(120px, 220px);
+          min-width: 0;
+          max-width: 220px;
+          margin-left: auto;
           justify-self: end;
+          box-sizing: border-box;
+        }
+
+        .bottom-row .metric-cost {
+          width: 220px;
+          min-width: 220px;
+          max-width: 220px;
+          box-sizing: border-box;
         }
 
         .sub-row {
@@ -2008,11 +3003,11 @@ class PowerCostCard extends HTMLElement {
 
                     ${this._config.show_graph && this._expandedGraphs[row.entityId] ? `
                       <div class="bottom-row">
-                        <div class="metric">
+                        ${this._renderPremiumGraph(this._config.entities.find((x) => x.entity === row.entityId) || { entity: row.entityId })}
+                        <div class="metric metric-cost">
                           <div class="label">עלות</div>
                           <div class="v">${this._formatMoney(row.cost, row.currency)}</div>
                         </div>
-                        ${this._renderPremiumGraph(this._config.entities.find((x) => x.entity === row.entityId) || { entity: row.entityId })}
                       </div>
                     ` : `
                       <div class="metric metric-cost">
@@ -2056,6 +3051,55 @@ class PowerCostCard extends HTMLElement {
         </div>
       </ha-card>
     `;
+
+    const toggleServiceCall = (toggleEntity, nextChecked) => {
+      if (!toggleEntity || !this._hass) return;
+      const domain = String(toggleEntity).split(".")[0];
+      const service = nextChecked ? "turn_on" : "turn_off";
+      if (["fan", "light", "switch", "climate"].includes(domain)) {
+        this._hass.callService(domain, service, { entity_id: toggleEntity });
+      } else {
+        this._hass.callService("homeassistant", service, { entity_id: toggleEntity });
+      }
+    };
+
+    this.shadowRoot.querySelectorAll('[data-toggle]').forEach((el) => {
+      el.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const toggleEntity = el.dataset.toggle;
+        if (!toggleEntity || !this._hass) return;
+        const isCurrentlyOn = this._isOnState(this._hass.states?.[toggleEntity]?.state);
+        toggleServiceCall(toggleEntity, !isCurrentlyOn);
+      });
+    });
+
+    this.shadowRoot.querySelectorAll("ha-switch[data-toggle]").forEach((el) => {
+      const handler = (ev) => {
+        ev.stopPropagation();
+        const toggleEntity = el.dataset.toggle;
+        if (!toggleEntity || !this._hass) return;
+        const nextChecked =
+          typeof ev.detail?.value === "boolean"
+            ? ev.detail.value
+            : !this._isOnState(this._hass.states?.[toggleEntity]?.state);
+        toggleServiceCall(toggleEntity, nextChecked);
+      };
+
+      el.addEventListener("change", handler);
+      el.addEventListener("value-changed", handler);
+      el.addEventListener("click", (ev) => ev.stopPropagation());
+    });
+
+    setTimeout(() => {
+      const closePicker = (ev) => {
+        if (!this.contains(ev.target)) {
+          this._activeIconPickerIndex = null;
+          document.removeEventListener("click", closePicker, true);
+          this._render();
+        }
+      };
+      document.addEventListener("click", closePicker, true);
+    }, 0);
   }
 }
 
