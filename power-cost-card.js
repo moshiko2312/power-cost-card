@@ -1,3 +1,218 @@
+function normalizePowerCostIcon(rawIcon) {
+  if (rawIcon == null) return "";
+  const readValue = (value) => {
+    if (value == null) return "";
+    if (typeof value === "string" || typeof value === "number") return String(value);
+    if (typeof value === "object") {
+      const direct = value.value ?? value.icon ?? value.name ?? "";
+      if (direct && typeof direct !== "object") return String(direct);
+      return "";
+    }
+    return "";
+  };
+
+  let icon = readValue(rawIcon).trim();
+  if (!icon) return "";
+
+  // Align "mdi-lightbulb" style with HA expected "mdi:lightbulb".
+  if (/^mdi[-_]/i.test(icon)) {
+    icon = `mdi:${icon.slice(4)}`;
+  }
+
+  return icon.trim().replace(/\s+/g, "").replace(/["'`<>]/g, "").toLowerCase();
+}
+
+function isPowerCostIconId(icon) {
+  const v = String(icon || "").trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*$/.test(v);
+}
+
+function isPowerCostEntityId(value) {
+  return /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(String(value || "").trim());
+}
+
+function normalizePowerCostEntityId(rawEntity) {
+  const normalizeText = (value) => {
+    const text = String(value ?? "").trim();
+    if (!text) return null;
+    if (isPowerCostEntityId(text)) return text.toLowerCase();
+
+    const match = text.match(/[a-z0-9_]+\.[a-z0-9_]+/i);
+    if (match?.[0]) return match[0].toLowerCase();
+    return text;
+  };
+
+  if (rawEntity == null) return null;
+  if (typeof rawEntity === "string" || typeof rawEntity === "number") {
+    return normalizeText(rawEntity);
+  }
+  if (typeof rawEntity === "object") {
+    const fields = [
+      rawEntity.entity_id,
+      rawEntity.entityId,
+      rawEntity.entity,
+      rawEntity.id,
+      rawEntity.value,
+      rawEntity.name,
+      rawEntity.label,
+    ];
+    const normalized = fields
+      .map((v) => (typeof v === "string" || typeof v === "number" ? normalizeText(v) : null))
+      .filter(Boolean);
+    const exact = normalized.find((v) => isPowerCostEntityId(v));
+    if (exact) return exact.toLowerCase();
+    if (normalized[0]) return normalized[0];
+    const fallback = normalizeText(rawEntity.toString?.());
+    if (fallback) {
+      return fallback;
+    }
+  }
+  return null;
+}
+
+function hasPowerCostPhaseEntities(cfg) {
+  if (!cfg) return false;
+  return Boolean(
+    normalizePowerCostEntityId(cfg.phase_1_entity) ||
+    normalizePowerCostEntityId(cfg.phase_2_entity) ||
+    normalizePowerCostEntityId(cfg.phase_3_entity)
+  );
+}
+
+const POWER_COST_I18N = {
+  he: {
+    default_title: "עלות צריכת חשמל",
+    period_day: "היום",
+    period_week: "השבוע",
+    period_month: "החודש",
+    graph_show: "הצג גרף",
+    graph_hide: "הסתר גרף",
+    summary_total_cost: "עלות כוללת {period}",
+    summary_total_consumption: "צריכה כוללת",
+    summary_calc_sub: "חישוב לפי זמן פעילות והספק",
+    summary_entities_priced: "{count} ישויות בתמחור",
+    top_devices_title: "המכשירים הכי בזבזניים",
+    tooltip_more_info: "פתח מידע נוסף",
+    tooltip_info: "מידע",
+    btn_open: "פתח",
+    btn_close: "סגור",
+    btn_show: "הצג",
+    btn_minimize: "מזער",
+    label_active_time: "זמן פעיל {period}",
+    label_power_for_calc: "הספק לחישוב",
+    label_consumption: "צריכה",
+    label_cost: "עלות",
+    phase_total_consumption: "צריכה כללית",
+    dynamic_based_on: "מבוסס כרגע על {entity}",
+    duration_day_singular: "יום",
+    duration_day_plural: "ימים",
+    row_default_panel: "לוח תלת פאזי",
+    row_default_three_phase: "ישות תלת פאזית",
+    row_default_entity: "ישות",
+    error_history: "שגיאה בטעינת היסטוריה: {error}",
+    warn_dynamic_power:
+      "ישויות עם power_entity מחושבות לפי ערך ההספק הנוכחי בזמן התצוגה. זה נוח, אבל פחות מדויק אם ההספק השתנה לאורך התקופה.",
+    warn_no_history:
+      "אם אין היסטוריה לישות מסוימת, ודא שהיא נרשמת ב-recorder ושיש לה נתוני history זמינים.",
+    formula_text:
+      "נוסחה: זמן פעילות × הספק בוואט ÷ 1000 × מחיר לקוט\"ש. הכרטיס מחשב לפי מצב פעיל של הישות בתקופה שנבחרה.",
+  },
+  en: {
+    default_title: "Power Consumption Cost",
+    period_day: "Today",
+    period_week: "This week",
+    period_month: "This month",
+    graph_show: "Show Graph",
+    graph_hide: "Hide Graph",
+    summary_total_cost: "Total Cost {period}",
+    summary_total_consumption: "Total Consumption",
+    summary_calc_sub: "Calculated by active time and power",
+    summary_entities_priced: "{count} priced entities",
+    top_devices_title: "Top Energy Consumers",
+    tooltip_more_info: "Open more info",
+    tooltip_info: "Info",
+    btn_open: "Open",
+    btn_close: "Close",
+    btn_show: "Show",
+    btn_minimize: "Minimize",
+    label_active_time: "Active Time {period}",
+    label_power_for_calc: "Power for Calculation",
+    label_consumption: "Consumption",
+    label_cost: "Cost",
+    phase_total_consumption: "Total Consumption",
+    dynamic_based_on: "Currently based on {entity}",
+    duration_day_singular: "day",
+    duration_day_plural: "days",
+    row_default_panel: "3-phase panel",
+    row_default_three_phase: "3-phase entity",
+    row_default_entity: "Entity",
+    error_history: "History load error: {error}",
+    warn_dynamic_power:
+      "Entities with power_entity are calculated using current power at render time. This is convenient, but less accurate if power changed during the selected period.",
+    warn_no_history:
+      "If an entity has no history, verify recorder includes it and history data is available.",
+    formula_text:
+      "Formula: active time × power in watts ÷ 1000 × price per kWh. The card calculates by entity active state during the selected period.",
+  },
+  ru: {
+    default_title: "Стоимость потребления электроэнергии",
+    period_day: "Сегодня",
+    period_week: "На этой неделе",
+    period_month: "В этом месяце",
+    graph_show: "Показать график",
+    graph_hide: "Скрыть график",
+    summary_total_cost: "Общая стоимость {period}",
+    summary_total_consumption: "Общее потребление",
+    summary_calc_sub: "Расчет по времени работы и мощности",
+    summary_entities_priced: "{count} сущностей с тарифом",
+    top_devices_title: "Самые энергозатратные устройства",
+    tooltip_more_info: "Открыть подробности",
+    tooltip_info: "Информация",
+    btn_open: "Открыть",
+    btn_close: "Закрыть",
+    btn_show: "Показать",
+    btn_minimize: "Свернуть",
+    label_active_time: "Время работы {period}",
+    label_power_for_calc: "Мощность для расчета",
+    label_consumption: "Потребление",
+    label_cost: "Стоимость",
+    phase_total_consumption: "Общее потребление",
+    dynamic_based_on: "Сейчас основано на {entity}",
+    duration_day_singular: "день",
+    duration_day_plural: "дней",
+    row_default_panel: "3-фазный щит",
+    row_default_three_phase: "3-фазная сущность",
+    row_default_entity: "Сущность",
+    error_history: "Ошибка загрузки истории: {error}",
+    warn_dynamic_power:
+      "Сущности с power_entity рассчитываются по текущей мощности на момент отображения. Это удобно, но менее точно, если мощность менялась в выбранном периоде.",
+    warn_no_history:
+      "Если для сущности нет истории, убедитесь, что recorder ее записывает и история доступна.",
+    formula_text:
+      "Формула: время работы × мощность в ваттах ÷ 1000 × цена за кВт·ч. Карточка считает по активному состоянию сущности за выбранный период.",
+  },
+};
+
+function normalizePowerCostLanguage(value) {
+  const v = String(value || "he").toLowerCase();
+  if (v.startsWith("en")) return "en";
+  if (v.startsWith("ru")) return "ru";
+  return "he";
+}
+
+function powerCostTranslate(lang, key, vars = {}) {
+  const safeLang = normalizePowerCostLanguage(lang);
+  const template =
+    POWER_COST_I18N[safeLang]?.[key] ??
+    POWER_COST_I18N.he?.[key] ??
+    String(key || "");
+
+  return String(template).replace(/\{([a-z0-9_]+)\}/gi, (_, varKey) => {
+    const v = vars?.[varKey];
+    return v == null ? "" : String(v);
+  });
+}
+
 class PowerCostCardEditor extends HTMLElement {
   constructor() {
     super();
@@ -34,7 +249,16 @@ class PowerCostCardEditor extends HTMLElement {
 
   _saveEntities(entities) {
     const config = { ...(this._config || {}) };
-    config.entities = entities.filter((x) => x && x.entity);
+    config.entities = entities.filter(
+      (x) =>
+        x &&
+        (
+          normalizePowerCostEntityId(x.entity) ||
+          x.is_three_phase ||
+          x.is_three_phase_panel ||
+          hasPowerCostPhaseEntities(x)
+        )
+    );
     this._config = config;
     this._emitConfig(config);
     this._render();
@@ -59,7 +283,24 @@ class PowerCostCardEditor extends HTMLElement {
         config[field] = num;
       }
     } else {
-      config[field] = rawValue;
+      if (field === "language") {
+        const nextLanguage = normalizePowerCostLanguage(rawValue);
+        const currentTitle = String(config.title || "").trim();
+        const heDefaultTitle = powerCostTranslate("he", "default_title");
+        const enDefaultTitle = powerCostTranslate("en", "default_title");
+        const ruDefaultTitle = powerCostTranslate("ru", "default_title");
+        config[field] = nextLanguage;
+        if (
+          !currentTitle ||
+          currentTitle === heDefaultTitle ||
+          currentTitle === enDefaultTitle ||
+          currentTitle === ruDefaultTitle
+        ) {
+          config.title = powerCostTranslate(nextLanguage, "default_title");
+        }
+      } else {
+        config[field] = rawValue;
+      }
     }
 
     this._config = config;
@@ -74,6 +315,17 @@ class PowerCostCardEditor extends HTMLElement {
       name: "",
       power_w: undefined,
       power_entity: undefined,
+      is_three_phase: false,
+      is_three_phase_panel: false,
+      phase_1_entity: undefined,
+      phase_2_entity: undefined,
+      phase_3_entity: undefined,
+      phase_1_voltage_entity: undefined,
+      phase_2_voltage_entity: undefined,
+      phase_3_voltage_entity: undefined,
+      phase_1_current_entity: undefined,
+      phase_2_current_entity: undefined,
+      phase_3_current_entity: undefined,
       price_per_kwh: undefined,
       icon: undefined,
       active_icon_color: undefined,
@@ -144,6 +396,17 @@ class PowerCostCardEditor extends HTMLElement {
         name: "",
         power_w: undefined,
         power_entity: undefined,
+        is_three_phase: false,
+        is_three_phase_panel: false,
+        phase_1_entity: undefined,
+        phase_2_entity: undefined,
+        phase_3_entity: undefined,
+        phase_1_voltage_entity: undefined,
+        phase_2_voltage_entity: undefined,
+        phase_3_voltage_entity: undefined,
+        phase_1_current_entity: undefined,
+        phase_2_current_entity: undefined,
+        phase_3_current_entity: undefined,
         price_per_kwh: undefined,
         icon: undefined,
         active_icon_color: undefined,
@@ -158,8 +421,63 @@ class PowerCostCardEditor extends HTMLElement {
       next[key] = rawValue === "" ? undefined : Number(rawValue);
     } else if (["allow_minimize"].includes(key)) {
       next[key] = Boolean(rawValue);
+    } else if (key === "icon") {
+      const normalizedIcon = normalizePowerCostIcon(rawValue);
+      if (normalizedIcon === "") {
+        next[key] = undefined;
+      } else if (isPowerCostIconId(normalizedIcon)) {
+        next[key] = normalizedIcon;
+      } else {
+        return;
+      }
     } else {
       next[key] = rawValue === "" ? undefined : rawValue;
+    }
+
+    entities[index] = next;
+    this._saveEntities(entities);
+  }
+
+  _setEntityMode(index, modeRaw) {
+    const entities = this._getEntities();
+
+    while (entities.length <= index) {
+      entities.push({
+        entity: "",
+        name: "",
+        power_w: undefined,
+        power_entity: undefined,
+        is_three_phase: false,
+        is_three_phase_panel: false,
+        phase_1_entity: undefined,
+        phase_2_entity: undefined,
+        phase_3_entity: undefined,
+        phase_1_voltage_entity: undefined,
+        phase_2_voltage_entity: undefined,
+        phase_3_voltage_entity: undefined,
+        phase_1_current_entity: undefined,
+        phase_2_current_entity: undefined,
+        phase_3_current_entity: undefined,
+        price_per_kwh: undefined,
+        icon: undefined,
+        active_icon_color: undefined,
+        allow_minimize: true,
+        currency: this._config?.currency || "₪",
+      });
+    }
+
+    const next = { ...(entities[index] || {}) };
+    const mode = String(modeRaw || "single");
+
+    if (mode === "three_phase") {
+      next.is_three_phase = true;
+      next.is_three_phase_panel = false;
+    } else if (mode === "three_phase_panel") {
+      next.is_three_phase = false;
+      next.is_three_phase_panel = true;
+    } else {
+      next.is_three_phase = false;
+      next.is_three_phase_panel = false;
     }
 
     entities[index] = next;
@@ -174,9 +492,10 @@ class PowerCostCardEditor extends HTMLElement {
     const icons = [];
 
     const addIcon = (icon) => {
-      if (!icon || seen.has(icon) || !String(icon).startsWith("mdi:")) return;
-      seen.add(icon);
-      icons.push(icon);
+      const normalized = normalizePowerCostIcon(icon);
+      if (!normalized || seen.has(normalized) || !normalized.startsWith("mdi:")) return;
+      seen.add(normalized);
+      icons.push(normalized);
     };
 
     Object.values(states).forEach((stateObj) => addIcon(stateObj?.attributes?.icon));
@@ -225,9 +544,10 @@ class PowerCostCardEditor extends HTMLElement {
     const icons = [];
 
     const addIcon = (icon) => {
-      if (!icon || seen.has(icon) || !String(icon).startsWith("mdi:")) return;
-      seen.add(icon);
-      icons.push(icon);
+      const normalized = normalizePowerCostIcon(icon);
+      if (!normalized || seen.has(normalized) || !normalized.startsWith("mdi:")) return;
+      seen.add(normalized);
+      icons.push(normalized);
     };
 
     Object.values(states).forEach((stateObj) => addIcon(stateObj?.attributes?.icon));
@@ -320,9 +640,10 @@ class PowerCostCardEditor extends HTMLElement {
     const icons = [];
 
     const addIcon = (icon) => {
-      if (!icon || seen.has(icon) || !String(icon).startsWith("mdi:")) return;
-      seen.add(icon);
-      icons.push(icon);
+      const normalized = normalizePowerCostIcon(icon);
+      if (!normalized || seen.has(normalized) || !normalized.startsWith("mdi:")) return;
+      seen.add(normalized);
+      icons.push(normalized);
     };
 
     Object.values(states).forEach((stateObj) => addIcon(stateObj?.attributes?.icon));
@@ -441,9 +762,16 @@ class PowerCostCardEditor extends HTMLElement {
 
   _entitySummary(row) {
     const title = row?.name || row?.entity || "ישות חדשה";
-    const meta = [row?.entity || "", row?.power_entity || "", row?.power_w != null && row?.power_w !== "" ? `${row.power_w}W` : ""]
-      .filter(Boolean)
-      .join(" • ");
+    const modeLabel =
+      row?.is_three_phase_panel
+        ? "לוח תלת-פאזי"
+        : (row?.is_three_phase ? "יישות תלת-פאזית" : "יישות בודדת");
+    const meta = [
+      row?.entity || "",
+      modeLabel,
+      (!row?.is_three_phase && !row?.is_three_phase_panel) ? (row?.power_entity || "") : "",
+      row?.power_w != null && row?.power_w !== "" ? `${row.power_w}W` : ""
+    ].filter(Boolean).join(" • ");
     return { title, meta };
   }
 
@@ -515,6 +843,7 @@ class PowerCostCardEditor extends HTMLElement {
 
   _render() {
     const config = this._config || {};
+    const editorLanguage = normalizePowerCostLanguage(config.language || "he");
     const entities = this._getEntities();
     const mainEntityOptions = this._entityDatalistOptions(["light", "switch", "fan", "climate"]);
     const powerEntityOptions = this._entityDatalistOptions(["sensor"]);
@@ -532,6 +861,11 @@ class PowerCostCardEditor extends HTMLElement {
     const renderEntity = (row, index) => {
       const summary = this._entitySummary(row);
       const isOpen = this._isEntityEditorOpen(index);
+      const safeRowIcon = normalizePowerCostIcon(row.icon);
+      const displayRowIcon = safeRowIcon || "mdi:flash";
+      const mode = row.is_three_phase_panel
+        ? "three_phase_panel"
+        : (row.is_three_phase ? "three_phase" : "single");
 
       return `
         <div class="entity-row ${isOpen ? "open" : ""}" data-entity-row="${index}">
@@ -539,7 +873,7 @@ class PowerCostCardEditor extends HTMLElement {
             <button class="drag-handle" type="button" draggable="true" title="גרור לסידור" aria-label="גרור לסידור" data-drag-handle="${index}">⋮⋮</button>
             <button class="entity-toggle" type="button" data-entity-toggle="${index}">
               <span class="entity-header-main">
-                <span class="entity-mini-icon"><ha-icon icon="${row.icon || "mdi:flash"}"></ha-icon></span>
+                <span class="entity-mini-icon"><ha-icon icon="${displayRowIcon}"></ha-icon></span>
                 <span class="entity-texts">
                   <span class="entity-name">${summary.title}</span>
                   <span class="entity-meta">${summary.meta || "הגדרות ישות"}</span>
@@ -554,25 +888,65 @@ class PowerCostCardEditor extends HTMLElement {
               <div class="entity-actions-row">
                 <button class="btn danger delete-row-btn" type="button" data-delete-entity="${index}">מחק ישות</button>
               </div>
-              <div class="entity-grid two-col">
-                <label>
-                  <span>Entity</span>
+              <div class="entity-grid mode-grid">
+                <label class="mode-chip ${mode === "single" ? "active" : ""}">
                   <input
-                    data-row-field="entity"
-                    data-index="${index}"
-                    value="${row.entity || ""}"
-                    list="power-cost-entity-list"
-                    placeholder="בחר או כתוב entity"
-                    autocapitalize="off"
-                    autocorrect="off"
-                    spellcheck="false"
+                    type="radio"
+                    name="entity-mode-${index}"
+                    data-row-mode="${index}"
+                    value="single"
+                    ${mode === "single" ? "checked" : ""}
                   >
+                  <span>יישות בודדת</span>
                 </label>
+                <label class="mode-chip ${mode === "three_phase" ? "active" : ""}">
+                  <input
+                    type="radio"
+                    name="entity-mode-${index}"
+                    data-row-mode="${index}"
+                    value="three_phase"
+                    ${mode === "three_phase" ? "checked" : ""}
+                  >
+                  <span>יישות תלת פאזית</span>
+                </label>
+                <label class="mode-chip ${mode === "three_phase_panel" ? "active" : ""}">
+                  <input
+                    type="radio"
+                    name="entity-mode-${index}"
+                    data-row-mode="${index}"
+                    value="three_phase_panel"
+                    ${mode === "three_phase_panel" ? "checked" : ""}
+                  >
+                  <span>מצב לוח תלת פאזי</span>
+                </label>
+              </div>
+              <div class="entity-grid two-col">
+                ${row.is_three_phase_panel ? `
+                  <label>
+                    <span>שם להצגה</span>
+                    <input data-row-field="name" data-index="${index}" value="${row.name || ""}" placeholder="לוח ראשי / 3 פאזות">
+                  </label>
+                  <div></div>
+                ` : `
+                  <label>
+                    <span>Entity</span>
+                    <input
+                      data-row-field="entity"
+                      data-index="${index}"
+                      value="${row.entity || ""}"
+                      list="power-cost-entity-list"
+                      placeholder="בחר או כתוב entity"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    >
+                  </label>
 
-                <label>
-                  <span>שם להצגה</span>
-                  <input data-row-field="name" data-index="${index}" value="${row.name || ""}">
-                </label>
+                  <label>
+                    <span>שם להצגה</span>
+                    <input data-row-field="name" data-index="${index}" value="${row.name || ""}">
+                  </label>
+                `}
               </div>
 
               <div class="entity-grid two-col">
@@ -580,11 +954,11 @@ class PowerCostCardEditor extends HTMLElement {
                   <span>אייקון</span>
                   <div class="icon-ha-picker-row">
                     <span class="icon-preview">
-                      <ha-icon icon="${row.icon || 'mdi:flash'}"></ha-icon>
+                      <ha-icon icon="${displayRowIcon}"></ha-icon>
                     </span>
                     <ha-icon-picker
                       data-icon-picker-native="${index}"
-                      placeholder="${row.icon || "mdi:icon-name"}"
+                      placeholder="${safeRowIcon || "mdi:icon-name"}"
                     ></ha-icon-picker>
                   </div>
                 </label>
@@ -650,45 +1024,185 @@ class PowerCostCardEditor extends HTMLElement {
                 </label>
               </div>
 
-              <div class="entity-grid four-col">
-                <label>
-                  <span>Power קבוע ב-W</span>
-                  <input data-row-field="power_w" data-index="${index}" type="number" step="0.1" value="${row.power_w ?? ""}">
-                </label>
+              ${(!row.is_three_phase && !row.is_three_phase_panel) ? `
+                <div class="entity-grid four-col">
+                  <label>
+                    <span>Power קבוע ב-W</span>
+                    <input data-row-field="power_w" data-index="${index}" type="number" step="0.1" value="${row.power_w ?? ""}">
+                  </label>
 
-                <label>
-                  <span>Power entity</span>
-                  <input
-                    data-row-field="power_entity"
-                    data-index="${index}"
-                    value="${row.power_entity || ""}"
-                    list="power-cost-power-entity-list"
-                    placeholder="בחר או כתוב sensor"
-                    autocapitalize="off"
-                    autocorrect="off"
-                    spellcheck="false"
-                  >
-                </label>
+                  <label>
+                    <span>Power entity</span>
+                    <input
+                      data-row-field="power_entity"
+                      data-index="${index}"
+                      value="${row.power_entity || ""}"
+                      list="power-cost-power-entity-list"
+                      placeholder="בחר או כתוב sensor"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    >
+                  </label>
 
-                <label>
-                  <span>מחיר לקוט"ש</span>
-                  <input data-row-field="price_per_kwh" data-index="${index}" type="number" step="0.001" value="${row.price_per_kwh ?? ""}">
-                </label>
+                  <label>
+                    <span>מחיר לקוט"ש</span>
+                    <input data-row-field="price_per_kwh" data-index="${index}" type="number" step="0.001" value="${row.price_per_kwh ?? ""}">
+                  </label>
 
-                <label>
-                  <span>מטבע</span>
-                  <input data-row-field="currency" data-index="${index}" value="${row.currency || config.currency || "₪"}">
-                </label>
-              </div>
+                  <label>
+                    <span>מטבע</span>
+                    <input data-row-field="currency" data-index="${index}" value="${row.currency || config.currency || "₪"}">
+                  </label>
+                </div>
+              ` : `
+                <div class="entity-grid two-col">
+                  <label>
+                    <span>מחיר לקוט"ש</span>
+                    <input data-row-field="price_per_kwh" data-index="${index}" type="number" step="0.001" value="${row.price_per_kwh ?? ""}">
+                  </label>
+
+                  <label>
+                    <span>מטבע</span>
+                    <input data-row-field="currency" data-index="${index}" value="${row.currency || config.currency || "₪"}">
+                  </label>
+                </div>
+              `}
+
+              ${(row.is_three_phase || row.is_three_phase_panel) ? `
+                <div class="entity-grid three-phase-grid">
+                  <label>
+                    <span>Phase 1 entity</span>
+                    <input
+                      data-row-field="phase_1_entity"
+                      data-index="${index}"
+                      value="${row.phase_1_entity || ""}"
+                      list="power-cost-power-entity-list"
+                      placeholder="sensor.l1_power"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    >
+                  </label>
+                  <label>
+                    <span>Phase 2 entity</span>
+                    <input
+                      data-row-field="phase_2_entity"
+                      data-index="${index}"
+                      value="${row.phase_2_entity || ""}"
+                      list="power-cost-power-entity-list"
+                      placeholder="sensor.l2_power"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    >
+                  </label>
+                  <label>
+                    <span>Phase 3 entity</span>
+                    <input
+                      data-row-field="phase_3_entity"
+                      data-index="${index}"
+                      value="${row.phase_3_entity || ""}"
+                      list="power-cost-power-entity-list"
+                      placeholder="sensor.l3_power"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    >
+                  </label>
+                </div>
+                <div class="entity-grid three-phase-grid">
+                  <label>
+                    <span>L1 voltage entity (optional)</span>
+                    <input
+                      data-row-field="phase_1_voltage_entity"
+                      data-index="${index}"
+                      value="${row.phase_1_voltage_entity || ""}"
+                      list="power-cost-power-entity-list"
+                      placeholder="sensor.l1_voltage"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    >
+                  </label>
+                  <label>
+                    <span>L2 voltage entity (optional)</span>
+                    <input
+                      data-row-field="phase_2_voltage_entity"
+                      data-index="${index}"
+                      value="${row.phase_2_voltage_entity || ""}"
+                      list="power-cost-power-entity-list"
+                      placeholder="sensor.l2_voltage"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    >
+                  </label>
+                  <label>
+                    <span>L3 voltage entity (optional)</span>
+                    <input
+                      data-row-field="phase_3_voltage_entity"
+                      data-index="${index}"
+                      value="${row.phase_3_voltage_entity || ""}"
+                      list="power-cost-power-entity-list"
+                      placeholder="sensor.l3_voltage"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    >
+                  </label>
+                </div>
+                <div class="entity-grid three-phase-grid">
+                  <label>
+                    <span>L1 current entity (optional)</span>
+                    <input
+                      data-row-field="phase_1_current_entity"
+                      data-index="${index}"
+                      value="${row.phase_1_current_entity || ""}"
+                      list="power-cost-power-entity-list"
+                      placeholder="sensor.l1_current"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    >
+                  </label>
+                  <label>
+                    <span>L2 current entity (optional)</span>
+                    <input
+                      data-row-field="phase_2_current_entity"
+                      data-index="${index}"
+                      value="${row.phase_2_current_entity || ""}"
+                      list="power-cost-power-entity-list"
+                      placeholder="sensor.l2_current"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    >
+                  </label>
+                  <label>
+                    <span>L3 current entity (optional)</span>
+                    <input
+                      data-row-field="phase_3_current_entity"
+                      data-index="${index}"
+                      value="${row.phase_3_current_entity || ""}"
+                      list="power-cost-power-entity-list"
+                      placeholder="sensor.l3_current"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    >
+                  </label>
+                </div>
+              ` : ""}
 
               <div class="entity-grid single-col">
                 <label class="checkbox-like">
                   <input data-row-field="allow_minimize" data-index="${index}" type="checkbox" ${row.allow_minimize !== false ? "checked" : ""}>
-                  <span>אפשר מזעור לישות</span>
+                  <span>${row.is_three_phase_panel ? "אפשר מזעור לכרטיס" : "אפשר מזעור לישות"}</span>
                 </label>
               </div>
 
-              <div class="hint">בשדה הראשי מוצגים רק light / switch / fan / climate. בשדה Power entity מוצגים רק sensor.</div>
+              <div class="hint">במצב תלת-פאזי הכרטיס מחבר את 3 הסנסורים ומציג גם L1/L2/L3. אפשר להזין ישויות מתח/זרם לכל פאזה, ואם לא מזינים הוא ינסה לקרוא מה-attributes של סנסור ההספק. במצב לוח תלת-פאזי אין צורך ב-entity ראשי והוא מציג את שלוש הפאזות והסה"כ בעיצוב רוחבי.</div>
             </div>
           ` : ""}
         </div>
@@ -949,8 +1463,36 @@ class PowerCostCardEditor extends HTMLElement {
         .entity-grid.four-col {
           grid-template-columns: repeat(4, minmax(0, 1fr));
         }
+        .entity-grid.three-phase-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
         .entity-grid.single-col {
           grid-template-columns: 1fr;
+        }
+        .entity-grid.mode-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .mode-chip {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          min-height: 42px;
+          padding: 8px 10px;
+          border: 1px solid var(--divider-color);
+          border-radius: 10px;
+          cursor: pointer;
+          background: var(--card-background-color);
+          text-align: center;
+          box-sizing: border-box;
+          user-select: none;
+        }
+        .mode-chip input[type="radio"] {
+          margin: 0;
+        }
+        .mode-chip.active {
+          border-color: color-mix(in srgb, var(--primary-color) 42%, var(--divider-color));
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-color) 26%, transparent);
         }
         .icon-picker {
           position: relative;
@@ -1196,7 +1738,10 @@ class PowerCostCardEditor extends HTMLElement {
           .compact-grid,
           .checks,
           .entity-grid.two-col,
-          .entity-grid.four-col {
+          .entity-grid.mode-grid,
+          .entity-grid.four-col,
+          .entity-grid.three-phase-grid,
+          .phase-cards {
             grid-template-columns: 1fr;
           }
         }
@@ -1222,6 +1767,14 @@ class PowerCostCardEditor extends HTMLElement {
             <label>
               <span>רענון בשניות</span>
               <input data-field="refresh_seconds" type="number" min="10" step="1" value="${config.refresh_seconds ?? 60}">
+            </label>
+            <label>
+              <span>שפת כרטיס</span>
+              <select data-field="language">
+                <option value="he" ${editorLanguage === "he" ? "selected" : ""}>עברית</option>
+                <option value="en" ${editorLanguage === "en" ? "selected" : ""}>English</option>
+                <option value="ru" ${editorLanguage === "ru" ? "selected" : ""}>Русский</option>
+              </select>
             </label>
           </div>
         `)}
@@ -1442,6 +1995,15 @@ class PowerCostCardEditor extends HTMLElement {
       });
     });
 
+    this.querySelectorAll("[data-row-mode]").forEach((el) => {
+      el.addEventListener("change", (ev) => {
+        if (ev.target.type === "radio" && !ev.target.checked) return;
+        const index = Number(ev.target.dataset.rowMode);
+        const mode = ev.target.value || "single";
+        this._setEntityMode(index, mode);
+      });
+    });
+
     this.querySelectorAll("[data-delete-entity]").forEach((el) => {
       el.addEventListener("click", (ev) => {
         ev.preventDefault();
@@ -1541,34 +2103,105 @@ class PowerCostCardEditor extends HTMLElement {
 
     this.querySelectorAll("[data-icon-picker-native]").forEach((el) => {
       const index = Number(el.dataset.iconPickerNative);
-      const currentValue = entities[index]?.icon || "";
+      const currentValue = normalizePowerCostIcon(entities[index]?.icon);
 
       try {
-        if (currentValue) {
+        if (this._hass) {
+          el.hass = this._hass;
+        }
+      } catch (err) {}
+
+      try {
+        if (currentValue && isPowerCostIconId(currentValue)) {
           el.selectedItem = { value: currentValue, label: currentValue };
         }
       } catch (err) {}
 
-      const update = (value) => {
-        const nextValue = String(value || "");
+      const iconFromEvent = (ev) => {
+        const parseIconId = (rawValue, allowBareName = false) => {
+          const normalized = normalizePowerCostIcon(rawValue);
+          if (!normalized) return "";
+          if (isPowerCostIconId(normalized)) return normalized;
+          if (!allowBareName) return "";
+          if (!/^[a-z0-9][a-z0-9-_]*$/i.test(normalized)) return "";
+          return `mdi:${normalized.toLowerCase().replace(/_/g, "-")}`;
+        };
+
+        const selectedItemCandidates = [
+          ev?.detail?.selectedItem,
+          ev?.detail?.item,
+          ev?.detail?.selected,
+          ev?.target?.selectedItem,
+          el?.selectedItem,
+        ];
+
+        for (const item of selectedItemCandidates) {
+          if (!item) continue;
+          const fromValue = parseIconId(item?.value, true);
+          if (fromValue) return fromValue;
+          const fromIcon = parseIconId(item?.icon, true);
+          if (fromIcon) return fromIcon;
+          const fromName = parseIconId(item?.name, true);
+          if (fromName) return fromName;
+        }
+
+        const directSelectionCandidates = [
+          ev?.detail?.icon,
+          ev?.detail?.name,
+        ];
+        for (const rawCandidate of directSelectionCandidates) {
+          const candidate = parseIconId(rawCandidate, true);
+          if (candidate) return candidate;
+        }
+
+        const rawValueCandidates = [
+          ev?.detail?.value,
+          ev?.target?.value,
+          el?.value,
+        ];
+        for (const rawCandidate of rawValueCandidates) {
+          const candidate = parseIconId(rawCandidate, false);
+          if (candidate) return candidate;
+        }
+
+        return "";
+      };
+
+      const saveIcon = (ev) => {
+        const nextValue = iconFromEvent(ev);
         if (!nextValue) return;
         this._updateEntityRow(index, "icon", nextValue);
       };
 
       el.addEventListener("value-changed", (ev) => {
         ev.stopPropagation();
-        update(ev.detail?.value ?? ev.detail?.icon ?? ev.target?.value ?? "");
+        if (
+          !ev?.detail ||
+          (typeof ev.detail === "object" &&
+            !ev.detail?.selectedItem &&
+            !ev.detail?.item &&
+            !ev.detail?.selected &&
+            !ev.detail?.icon &&
+            !ev.detail?.name)
+        ) {
+          const fallback = normalizePowerCostIcon(ev?.detail?.value ?? ev?.target?.value ?? el?.value);
+          if (!isPowerCostIconId(fallback)) return;
+          this._updateEntityRow(index, "icon", fallback);
+          return;
+        }
+        saveIcon(ev);
       });
 
       el.addEventListener("change", (ev) => {
         ev.stopPropagation();
-        update(ev.detail?.value ?? ev.detail?.icon ?? ev.target?.value ?? "");
+        saveIcon(ev);
+        setTimeout(() => saveIcon({ detail: el?.selectedItem, target: el }), 0);
       });
 
       el.addEventListener("closed", (ev) => {
         ev.stopPropagation();
-        const picked = ev.detail?.value ?? ev.detail?.icon ?? ev.target?.value ?? "";
-        update(picked);
+        saveIcon(ev);
+        setTimeout(() => saveIcon({ detail: el?.selectedItem, target: el }), 0);
       });
     });
 
@@ -1684,6 +2317,8 @@ class PowerCostCard extends HTMLElement {
     this._interval = null;
     this._expandedGraphs = {};
     this._collapsedCards = {};
+    this._graphOpenAnimEntity = null;
+    this._graphCloseAnimEntity = null;
     this._boundClick = this._handleClick.bind(this);
     this._boundChange = this._handleChange.bind(this);
   }
@@ -1695,7 +2330,8 @@ class PowerCostCard extends HTMLElement {
   static getStubConfig() {
     return {
       type: "custom:power-cost-card",
-      title: "עלות צריכת חשמל",
+      title: powerCostTranslate("he", "default_title"),
+      language: "he",
       background_image: "",
       background_opacity: 0.18,
       background_size: "cover",
@@ -1724,8 +2360,19 @@ class PowerCostCard extends HTMLElement {
       entities: [
         {
           entity: "light.bedroom",
-          name: "מנורת חדר",
+          name: null,
           power_w: 10,
+          is_three_phase: false,
+          is_three_phase_panel: false,
+          phase_1_entity: null,
+          phase_2_entity: null,
+          phase_3_entity: null,
+          phase_1_voltage_entity: null,
+          phase_2_voltage_entity: null,
+          phase_3_voltage_entity: null,
+          phase_1_current_entity: null,
+          phase_2_current_entity: null,
+          phase_3_current_entity: null,
           price_per_kwh: 0.52,
           active_icon_color: "#ffb300",
           allow_minimize: true,
@@ -1736,8 +2383,45 @@ class PowerCostCard extends HTMLElement {
   }
 
   _buildStorageKey(entities) {
-    const entityIds = (entities || []).map((x) => x.entity).filter(Boolean).sort().join("|");
+    const entityIds = (entities || [])
+      .map((x) => this._rowIdFromConfig(x))
+      .filter(Boolean)
+      .sort()
+      .join("|");
     return `power-cost-card:${entityIds}`;
+  }
+
+  _panelIdFromConfig(cfg) {
+    if (!cfg?.is_three_phase_panel) return null;
+    const phaseKey = [
+      normalizePowerCostEntityId(cfg.phase_1_entity),
+      normalizePowerCostEntityId(cfg.phase_2_entity),
+      normalizePowerCostEntityId(cfg.phase_3_entity),
+    ]
+      .filter(Boolean)
+      .join("|");
+    return `panel:${phaseKey || (cfg.name || "default")}`;
+  }
+
+  _threePhaseIdFromConfig(cfg) {
+    if (!cfg?.is_three_phase) return null;
+    const phaseKey = [
+      normalizePowerCostEntityId(cfg.phase_1_entity),
+      normalizePowerCostEntityId(cfg.phase_2_entity),
+      normalizePowerCostEntityId(cfg.phase_3_entity),
+    ]
+      .filter(Boolean)
+      .join("|");
+    return `threephase:${phaseKey || (cfg.name || "default")}`;
+  }
+
+  _rowIdFromConfig(cfg) {
+    if (!cfg) return null;
+    const entityId = normalizePowerCostEntityId(cfg.entity);
+    if (entityId) return entityId;
+    if (cfg.is_three_phase_panel) return this._panelIdFromConfig(cfg);
+    if (cfg.is_three_phase || hasPowerCostPhaseEntities(cfg)) return this._threePhaseIdFromConfig({ ...cfg, is_three_phase: true });
+    return null;
   }
 
   _loadUiState() {
@@ -1772,7 +2456,19 @@ class PowerCostCard extends HTMLElement {
     const parts = [];
 
     for (const cfg of entities) {
-      const ids = [cfg.entity, cfg.power_entity].filter(Boolean);
+      const ids = [
+        normalizePowerCostEntityId(cfg.entity),
+        normalizePowerCostEntityId(cfg.power_entity),
+        normalizePowerCostEntityId(cfg.phase_1_entity),
+        normalizePowerCostEntityId(cfg.phase_2_entity),
+        normalizePowerCostEntityId(cfg.phase_3_entity),
+        normalizePowerCostEntityId(cfg.phase_1_voltage_entity),
+        normalizePowerCostEntityId(cfg.phase_2_voltage_entity),
+        normalizePowerCostEntityId(cfg.phase_3_voltage_entity),
+        normalizePowerCostEntityId(cfg.phase_1_current_entity),
+        normalizePowerCostEntityId(cfg.phase_2_current_entity),
+        normalizePowerCostEntityId(cfg.phase_3_current_entity),
+      ].filter(Boolean);
       for (const entityId of ids) {
         const st = hass?.states?.[entityId];
         parts.push(
@@ -1793,6 +2489,9 @@ class PowerCostCard extends HTMLElement {
 
   _isRowCollapsed(row) {
     if (!row?.allowMinimize) {
+      return false;
+    }
+    if (!row?.entityId) {
       return false;
     }
 
@@ -1819,6 +2518,7 @@ class PowerCostCard extends HTMLElement {
 
   setConfig(config) {
     if (!config) throw new Error("Invalid configuration");
+    const language = normalizePowerCostLanguage(config.language || "he");
 
     const normalizedEntities = this._normalizeEntities(config);
     if (!normalizedEntities.length) {
@@ -1828,7 +2528,11 @@ class PowerCostCard extends HTMLElement {
     this._storageKey = this._buildStorageKey(normalizedEntities);
     this._loadUiState();
 
-    const nextEntityIds = new Set(normalizedEntities.map((x) => x.entity));
+    const nextEntityIds = new Set(
+      normalizedEntities
+        .map((x) => this._rowIdFromConfig(x))
+        .filter(Boolean)
+    );
     this._collapsedCards = Object.fromEntries(
       Object.entries(this._collapsedCards || {}).filter(([entityId]) => nextEntityIds.has(entityId))
     );
@@ -1838,7 +2542,8 @@ class PowerCostCard extends HTMLElement {
     this._saveUiState();
 
     this._config = {
-      title: config.title || "עלות צריכת חשמל",
+      title: config.title || powerCostTranslate(language, "default_title"),
+      language,
       background_image: config.background_image || "",
       background_opacity: config.background_opacity ?? 0.18,
       background_size: config.background_size || "cover",
@@ -1918,33 +2623,152 @@ class PowerCostCard extends HTMLElement {
   _normalizeEntities(config) {
     if (Array.isArray(config.entities) && config.entities.length) {
       return config.entities
-        .filter((x) => x && x.entity)
-        .map((x) => ({
-          entity: x.entity,
-          name: x.name || null,
-          icon: x.icon || null,
-          active_icon_color: x.active_icon_color || null,
-          allow_minimize: x.allow_minimize !== false,
-          power_w: x.power_w != null && x.power_w !== "" ? Number(x.power_w) : undefined,
-          power_entity: x.power_entity || null,
-          price_per_kwh:
-            x.price_per_kwh != null && x.price_per_kwh !== ""
-              ? Number(x.price_per_kwh)
-              : undefined,
-          currency: x.currency || null,
-        }));
+        .filter(
+          (x) =>
+            x &&
+            (
+              normalizePowerCostEntityId(x.entity) ||
+              x.is_three_phase ||
+              x.is_three_phase_panel ||
+              hasPowerCostPhaseEntities(x)
+            )
+        )
+        .map((x) => {
+          const entityId = normalizePowerCostEntityId(x.entity);
+          const isThreePhasePanel = x.is_three_phase_panel === true;
+          return {
+            entity: entityId,
+            name: x.name || null,
+            icon: normalizePowerCostIcon(x.icon) || null,
+            active_icon_color: x.active_icon_color || null,
+            allow_minimize: x.allow_minimize !== false,
+            power_w: x.power_w != null && x.power_w !== "" ? Number(x.power_w) : undefined,
+            is_three_phase: x.is_three_phase === true,
+            is_three_phase_panel: isThreePhasePanel,
+            phase_1_entity: normalizePowerCostEntityId(x.phase_1_entity),
+            phase_2_entity: normalizePowerCostEntityId(x.phase_2_entity),
+            phase_3_entity: normalizePowerCostEntityId(x.phase_3_entity),
+            phase_1_voltage_entity: normalizePowerCostEntityId(x.phase_1_voltage_entity),
+            phase_2_voltage_entity: normalizePowerCostEntityId(x.phase_2_voltage_entity),
+            phase_3_voltage_entity: normalizePowerCostEntityId(x.phase_3_voltage_entity),
+            phase_1_current_entity: normalizePowerCostEntityId(x.phase_1_current_entity),
+            phase_2_current_entity: normalizePowerCostEntityId(x.phase_2_current_entity),
+            phase_3_current_entity: normalizePowerCostEntityId(x.phase_3_current_entity),
+            power_entity: normalizePowerCostEntityId(x.power_entity),
+            price_per_kwh:
+              x.price_per_kwh != null && x.price_per_kwh !== ""
+                ? Number(x.price_per_kwh)
+                : undefined,
+            currency: x.currency || null,
+          };
+        });
     }
 
-    if (config.entity) {
+    if (normalizePowerCostEntityId(config.entity)) {
       return [
         {
-          entity: config.entity,
+          entity: normalizePowerCostEntityId(config.entity),
           name: config.name || null,
-          icon: config.icon || null,
+          icon: normalizePowerCostIcon(config.icon) || null,
           active_icon_color: config.active_icon_color || null,
           allow_minimize: config.allow_minimize !== false,
           power_w: config.power_w != null ? Number(config.power_w) : undefined,
-          power_entity: config.power_entity || null,
+          is_three_phase: config.is_three_phase === true,
+          is_three_phase_panel: config.is_three_phase_panel === true,
+          phase_1_entity: normalizePowerCostEntityId(config.phase_1_entity),
+          phase_2_entity: normalizePowerCostEntityId(config.phase_2_entity),
+          phase_3_entity: normalizePowerCostEntityId(config.phase_3_entity),
+          phase_1_voltage_entity: normalizePowerCostEntityId(config.phase_1_voltage_entity),
+          phase_2_voltage_entity: normalizePowerCostEntityId(config.phase_2_voltage_entity),
+          phase_3_voltage_entity: normalizePowerCostEntityId(config.phase_3_voltage_entity),
+          phase_1_current_entity: normalizePowerCostEntityId(config.phase_1_current_entity),
+          phase_2_current_entity: normalizePowerCostEntityId(config.phase_2_current_entity),
+          phase_3_current_entity: normalizePowerCostEntityId(config.phase_3_current_entity),
+          power_entity: normalizePowerCostEntityId(config.power_entity),
+          price_per_kwh:
+            config.price_per_kwh != null ? Number(config.price_per_kwh) : undefined,
+          currency: config.currency || null,
+        },
+      ];
+    }
+
+    if (config.is_three_phase === true) {
+      return [
+        {
+          entity: null,
+          name: config.name || null,
+          icon: normalizePowerCostIcon(config.icon) || null,
+          active_icon_color: config.active_icon_color || null,
+          allow_minimize: config.allow_minimize !== false,
+          power_w: config.power_w != null ? Number(config.power_w) : undefined,
+          is_three_phase: true,
+          is_three_phase_panel: false,
+          phase_1_entity: normalizePowerCostEntityId(config.phase_1_entity),
+          phase_2_entity: normalizePowerCostEntityId(config.phase_2_entity),
+          phase_3_entity: normalizePowerCostEntityId(config.phase_3_entity),
+          phase_1_voltage_entity: normalizePowerCostEntityId(config.phase_1_voltage_entity),
+          phase_2_voltage_entity: normalizePowerCostEntityId(config.phase_2_voltage_entity),
+          phase_3_voltage_entity: normalizePowerCostEntityId(config.phase_3_voltage_entity),
+          phase_1_current_entity: normalizePowerCostEntityId(config.phase_1_current_entity),
+          phase_2_current_entity: normalizePowerCostEntityId(config.phase_2_current_entity),
+          phase_3_current_entity: normalizePowerCostEntityId(config.phase_3_current_entity),
+          power_entity: normalizePowerCostEntityId(config.power_entity),
+          price_per_kwh:
+            config.price_per_kwh != null ? Number(config.price_per_kwh) : undefined,
+          currency: config.currency || null,
+        },
+      ];
+    }
+
+    if (hasPowerCostPhaseEntities(config) && config.is_three_phase_panel !== true) {
+      return [
+        {
+          entity: null,
+          name: config.name || null,
+          icon: normalizePowerCostIcon(config.icon) || null,
+          active_icon_color: config.active_icon_color || null,
+          allow_minimize: config.allow_minimize !== false,
+          power_w: config.power_w != null ? Number(config.power_w) : undefined,
+          is_three_phase: true,
+          is_three_phase_panel: false,
+          phase_1_entity: normalizePowerCostEntityId(config.phase_1_entity),
+          phase_2_entity: normalizePowerCostEntityId(config.phase_2_entity),
+          phase_3_entity: normalizePowerCostEntityId(config.phase_3_entity),
+          phase_1_voltage_entity: normalizePowerCostEntityId(config.phase_1_voltage_entity),
+          phase_2_voltage_entity: normalizePowerCostEntityId(config.phase_2_voltage_entity),
+          phase_3_voltage_entity: normalizePowerCostEntityId(config.phase_3_voltage_entity),
+          phase_1_current_entity: normalizePowerCostEntityId(config.phase_1_current_entity),
+          phase_2_current_entity: normalizePowerCostEntityId(config.phase_2_current_entity),
+          phase_3_current_entity: normalizePowerCostEntityId(config.phase_3_current_entity),
+          power_entity: normalizePowerCostEntityId(config.power_entity),
+          price_per_kwh:
+            config.price_per_kwh != null ? Number(config.price_per_kwh) : undefined,
+          currency: config.currency || null,
+        },
+      ];
+    }
+
+    if (config.is_three_phase_panel === true) {
+      return [
+        {
+          entity: null,
+          name: config.name || null,
+          icon: normalizePowerCostIcon(config.icon) || null,
+          active_icon_color: config.active_icon_color || null,
+          allow_minimize: config.allow_minimize !== false,
+          power_w: config.power_w != null ? Number(config.power_w) : undefined,
+          is_three_phase: false,
+          is_three_phase_panel: true,
+          phase_1_entity: normalizePowerCostEntityId(config.phase_1_entity),
+          phase_2_entity: normalizePowerCostEntityId(config.phase_2_entity),
+          phase_3_entity: normalizePowerCostEntityId(config.phase_3_entity),
+          phase_1_voltage_entity: normalizePowerCostEntityId(config.phase_1_voltage_entity),
+          phase_2_voltage_entity: normalizePowerCostEntityId(config.phase_2_voltage_entity),
+          phase_3_voltage_entity: normalizePowerCostEntityId(config.phase_3_voltage_entity),
+          phase_1_current_entity: normalizePowerCostEntityId(config.phase_1_current_entity),
+          phase_2_current_entity: normalizePowerCostEntityId(config.phase_2_current_entity),
+          phase_3_current_entity: normalizePowerCostEntityId(config.phase_3_current_entity),
+          power_entity: null,
           price_per_kwh:
             config.price_per_kwh != null ? Number(config.price_per_kwh) : undefined,
           currency: config.currency || null,
@@ -1997,8 +2821,9 @@ class PowerCostCard extends HTMLElement {
         if (currentlyCollapsed) {
           const nextState = {};
           entities.forEach((cfg) => {
-            if (cfg?.entity && cfg.allow_minimize !== false) {
-              nextState[cfg.entity] = true;
+            const cfgId = this._rowIdFromConfig(cfg);
+            if (cfgId && cfg.allow_minimize !== false) {
+              nextState[cfgId] = true;
             }
           });
           nextState[collapseToggleEntity] = false;
@@ -2017,7 +2842,10 @@ class PowerCostCard extends HTMLElement {
 
     if (graphToggleEntity) {
       ev.stopPropagation();
-      this._expandedGraphs[graphToggleEntity] = !this._expandedGraphs[graphToggleEntity];
+      const nextExpanded = !this._expandedGraphs[graphToggleEntity];
+      this._expandedGraphs[graphToggleEntity] = nextExpanded;
+      this._graphOpenAnimEntity = nextExpanded ? graphToggleEntity : null;
+      this._graphCloseAnimEntity = nextExpanded ? null : graphToggleEntity;
       this._saveUiState();
       this._render();
       return;
@@ -2080,9 +2908,17 @@ class PowerCostCard extends HTMLElement {
   }
 
   _periodLabel(period) {
-    if (period === "month") return "החודש";
-    if (period === "week") return "השבוע";
-    return "היום";
+    if (period === "month") return this._t("period_month");
+    if (period === "week") return this._t("period_week");
+    return this._t("period_day");
+  }
+
+  _getLanguage() {
+    return normalizePowerCostLanguage(this._config?.language || "he");
+  }
+
+  _t(key, vars = {}) {
+    return powerCostTranslate(this._getLanguage(), key, vars);
   }
 
   _isOnState(state) {
@@ -2094,9 +2930,68 @@ class PowerCostCard extends HTMLElement {
     return Number.isFinite(n) ? n : undefined;
   }
 
+  _entityNumericState(entityId) {
+    const normalized = normalizePowerCostEntityId(entityId);
+    if (!normalized || !this._hass?.states?.[normalized]) return undefined;
+    return this._parseNumber(this._hass.states[normalized].state);
+  }
+
+  _entityAttributeNumber(entityId, keys = []) {
+    const normalized = normalizePowerCostEntityId(entityId);
+    if (!normalized || !this._hass?.states?.[normalized]) return undefined;
+    const attrs = this._hass.states[normalized]?.attributes || {};
+    for (const key of keys) {
+      const parsed = this._parseNumber(attrs[key]);
+      if (parsed != null) return parsed;
+    }
+    return undefined;
+  }
+
+  _phaseMetricValue(entityCfg, phaseNum, metric, phasePowerEntityId) {
+    const explicitEntityId = entityCfg[`phase_${phaseNum}_${metric}_entity`];
+    const explicitValue = this._entityNumericState(explicitEntityId);
+    if (explicitValue != null) return explicitValue;
+
+    const attributeKeys = metric === "voltage"
+      ? ["voltage", "Voltage", "line_voltage", "phase_voltage", "rms_voltage", "v"]
+      : ["current", "Current", "line_current", "phase_current", "rms_current", "amps", "ampere", "a"];
+    return this._entityAttributeNumber(phasePowerEntityId, attributeKeys);
+  }
+
+  _phasePowerValue(entityId) {
+    const parsed = this._entityNumericState(entityId);
+    return parsed != null ? parsed : 0;
+  }
+
+  _threePhasePower(entityCfg) {
+    const l1EntityId = normalizePowerCostEntityId(entityCfg.phase_1_entity);
+    const l2EntityId = normalizePowerCostEntityId(entityCfg.phase_2_entity);
+    const l3EntityId = normalizePowerCostEntityId(entityCfg.phase_3_entity);
+    const l1 = this._phasePowerValue(l1EntityId);
+    const l2 = this._phasePowerValue(l2EntityId);
+    const l3 = this._phasePowerValue(l3EntityId);
+
+    return {
+      l1,
+      l2,
+      l3,
+      l1Voltage: this._phaseMetricValue(entityCfg, 1, "voltage", l1EntityId),
+      l2Voltage: this._phaseMetricValue(entityCfg, 2, "voltage", l2EntityId),
+      l3Voltage: this._phaseMetricValue(entityCfg, 3, "voltage", l3EntityId),
+      l1Current: this._phaseMetricValue(entityCfg, 1, "current", l1EntityId),
+      l2Current: this._phaseMetricValue(entityCfg, 2, "current", l2EntityId),
+      l3Current: this._phaseMetricValue(entityCfg, 3, "current", l3EntityId),
+      total: l1 + l2 + l3,
+    };
+  }
+
   _entityPower(entityCfg) {
-    if (entityCfg.power_entity && this._hass?.states?.[entityCfg.power_entity]) {
-      const sensorState = this._hass.states[entityCfg.power_entity];
+    if (entityCfg.is_three_phase) {
+      return this._threePhasePower(entityCfg).total;
+    }
+    const powerEntityId = normalizePowerCostEntityId(entityCfg.power_entity);
+    if (powerEntityId && this._hass?.states?.[powerEntityId]) {
+      const sensorState = this._hass.states[powerEntityId];
       const parsed = this._parseNumber(sensorState.state);
       if (parsed != null) return parsed;
     }
@@ -2118,7 +3013,7 @@ class PowerCostCard extends HTMLElement {
   }
 
   async _maybeRefreshHistory(entityCfg, force = false) {
-    const entityId = entityCfg.entity;
+    const entityId = normalizePowerCostEntityId(entityCfg.entity);
     if (!entityId || !this._hass) return;
     if (this._loadingMap.get(entityId)) return;
 
@@ -2160,7 +3055,26 @@ class PowerCostCard extends HTMLElement {
   }
 
   _calculateOnMs(entityCfg) {
-    const entityId = entityCfg.entity;
+    const entityId = normalizePowerCostEntityId(entityCfg.entity);
+    if (!entityId) {
+      const isEntitylessThreePhase =
+        entityCfg.is_three_phase_panel === true ||
+        entityCfg.is_three_phase === true ||
+        hasPowerCostPhaseEntities(entityCfg);
+      if (!isEntitylessThreePhase) {
+        return 0;
+      }
+
+      const nowTotalPower = this._threePhasePower(entityCfg).total;
+      if (!(nowTotalPower > 0)) {
+        return 0;
+      }
+
+      const start = this._getPeriodStart(this._period);
+      const end = new Date();
+      return Math.max(0, end - start);
+    }
+
     const history = [...(this._historyMap.get(entityId) || [])]
       .filter((x) => x && x.last_changed)
       .sort((a, b) => new Date(a.last_changed) - new Date(b.last_changed));
@@ -2206,7 +3120,8 @@ class PowerCostCard extends HTMLElement {
     const m = String(minutes).padStart(2, "0");
 
     if (days > 0) {
-      return `${days} יום ${h}:${m}`;
+      const dayLabel = days === 1 ? this._t("duration_day_singular") : this._t("duration_day_plural");
+      return `${days} ${dayLabel} ${h}:${m}`;
     }
 
     return `${h}:${m}`;
@@ -2217,9 +3132,16 @@ class PowerCostCard extends HTMLElement {
     return `<span dir="ltr">${currency} ${v}</span>`;
   }
 
+  _formatPhaseMetric(value, unit, decimals = 0) {
+    if (value == null || !Number.isFinite(value)) return `—${unit}`;
+    if (decimals > 0) return `${Number(value).toFixed(decimals)}${unit}`;
+    return `${Math.round(value)}${unit}`;
+  }
+
 
   _getDisplayIcon(icon, isOn) {
-    if (!isOn) return icon;
+    const safeIcon = normalizePowerCostIcon(icon) || "mdi:flash";
+    if (!isOn) return safeIcon;
 
     const onMap = {
       "mdi:lightbulb": "mdi:lightbulb-on",
@@ -2232,7 +3154,7 @@ class PowerCostCard extends HTMLElement {
       "mdi:air-conditioner": "mdi:air-conditioner",
     };
 
-    return onMap[icon] || icon;
+    return onMap[safeIcon] || safeIcon;
   }
 
 
@@ -2311,14 +3233,13 @@ class PowerCostCard extends HTMLElement {
 
   _renderGraphToggle(entityId) {
     const expanded = !!this._expandedGraphs[entityId];
-    const buttonLabel = expanded ? "הסתר גרף" : "הצג גרף";
+    const buttonLabel = expanded ? this._t("graph_hide") : this._t("graph_show");
     return `<button type="button" class="graph-toggle-btn" data-graph-toggle="${entityId}">${buttonLabel}</button>`;
   }
 
   _renderPremiumGraph(entityCfg) {
     const entityId = entityCfg.entity;
     const expanded = !!this._expandedGraphs[entityId];
-    const buttonLabel = expanded ? "הסתר גרף" : "הצג גרף";
 
     if (!expanded) {
       return "";
@@ -2380,17 +3301,33 @@ class PowerCostCard extends HTMLElement {
   }
 
   _computeRow(entityCfg) {
-    const entityId = entityCfg.entity;
-    const stateObj = this._hass?.states?.[entityId];
+    const isThreePhasePanel = entityCfg.is_three_phase_panel === true;
+    const sourceEntityId = normalizePowerCostEntityId(entityCfg.entity);
+    const isThreePhase =
+      entityCfg.is_three_phase === true || (!isThreePhasePanel && hasPowerCostPhaseEntities(entityCfg));
+    const entityId = this._rowIdFromConfig(entityCfg);
+    const stateObj = sourceEntityId ? this._hass?.states?.[sourceEntityId] : null;
+    const phaseData =
+      (isThreePhase || isThreePhasePanel) ? this._threePhasePower(entityCfg) : null;
     const onMs = this._calculateOnMs(entityCfg);
     const onHours = onMs / 3600000;
-    const powerW = this._entityPower(entityCfg);
+    const powerW = phaseData ? phaseData.total : this._entityPower(entityCfg);
     const pricePerKwh = this._entityPrice(entityCfg);
     const currency = this._entityCurrency(entityCfg);
     const energyKwh = powerW != null ? (powerW / 1000) * onHours : 0;
     const cost = pricePerKwh != null ? energyKwh * pricePerKwh : 0;
-    const name = entityCfg.name || stateObj?.attributes?.friendly_name || entityId;
-    const icon = entityCfg.icon || stateObj?.attributes?.icon || "mdi:flash";
+    const name =
+      entityCfg.name ||
+      stateObj?.attributes?.friendly_name ||
+      (
+        isThreePhasePanel
+          ? this._t("row_default_panel")
+          : (isThreePhase ? this._t("row_default_three_phase") : (sourceEntityId || this._t("row_default_entity")))
+      );
+    const icon =
+      normalizePowerCostIcon(entityCfg.icon) ||
+      normalizePowerCostIcon(stateObj?.attributes?.icon) ||
+      "mdi:flash";
     const state = stateObj?.state || "unknown";
     const isOn = this._isOnState(state);
     const activeIconColor = entityCfg.active_icon_color || "var(--warning-color)";
@@ -2417,6 +3354,10 @@ class PowerCostCard extends HTMLElement {
       error,
       isDynamicPower,
       allowMinimize,
+      isThreePhase,
+      isThreePhasePanel,
+      phaseData,
+      sourceEntityId,
     };
   }
 
@@ -2427,9 +3368,10 @@ class PowerCostCard extends HTMLElement {
     const icons = [];
 
     const addIcon = (icon) => {
-      if (!icon || seen.has(icon)) return;
-      seen.add(icon);
-      icons.push(icon);
+      const normalized = normalizePowerCostIcon(icon);
+      if (!normalized || seen.has(normalized) || !normalized.startsWith("mdi:")) return;
+      seen.add(normalized);
+      icons.push(normalized);
     };
 
     Object.values(states).forEach((stateObj) => addIcon(stateObj?.attributes?.icon));
@@ -2472,12 +3414,14 @@ class PowerCostCard extends HTMLElement {
     if (!this._config) return;
 
     const rows = this._config.entities.map((entityCfg) => this._computeRow(entityCfg));
+    const costRows = rows.filter((row) => !row.isThreePhasePanel);
+    const hasCostRows = costRows.length > 0;
     const totalEnergy = rows.reduce((sum, row) => sum + row.energyKwh, 0);
     const currency = rows[0]?.currency || this._config.currency || "₪";
-    const totalCost = rows.reduce((sum, row) => sum + row.cost, 0);
-    const anyDynamic = rows.some((row) => row.isDynamicPower);
-    const mostExpensive = rows.length ? rows.reduce((a,b)=> b.cost>a.cost?b:a) : null;
-    const top3 = [...rows].sort((a,b)=>b.cost-a.cost).slice(0,3);
+    const totalCost = costRows.reduce((sum, row) => sum + row.cost, 0);
+    const anyDynamic = costRows.some((row) => row.isDynamicPower);
+    const mostExpensive = costRows.length ? costRows.reduce((a,b)=> b.cost>a.cost?b:a) : null;
+    const top3 = [...costRows].sort((a,b)=>b.cost-a.cost).slice(0,3);
     const anyError = rows.some((row) => row.error);
     const bgImage = this._resolveBackgroundImage();
     const bgOpacity = this._normalizeBackgroundOpacity(this._config?.background_opacity);
@@ -2616,10 +3560,12 @@ class PowerCostCard extends HTMLElement {
           border: 1px solid var(--divider-color);
           border-radius: var(--pcc-radius);
           padding: 14px;
+          text-align: center;
         }
 
         .label {
-          font-size: 12px;
+          font-size: 14px;
+          font-weight: 600;
           opacity: 0.72;
           margin-bottom: 6px;
         }
@@ -2752,6 +3698,7 @@ class PowerCostCard extends HTMLElement {
           padding: 10px;
           box-sizing: border-box;
           min-width: 0;
+          text-align: center;
         }
 
         .metric .v {
@@ -2765,6 +3712,9 @@ class PowerCostCard extends HTMLElement {
           grid-template-columns: minmax(0, calc(100% - 244px)) 220px;
           gap: 24px;
           align-items: stretch;
+        }
+        .bottom-row.graph-enter {
+          animation: graphEnter 220ms cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .bottom-row > * {
@@ -2863,18 +3813,26 @@ class PowerCostCard extends HTMLElement {
         }
 
         .metric-cost {
-          width: minmax(120px, 220px);
           min-width: 0;
-          max-width: 220px;
-          margin-left: auto;
-          justify-self: end;
           box-sizing: border-box;
+          text-align: center;
+        }
+        .metric-cost.metric-cost-solo {
+          width: 100%;
+          max-width: none;
+          margin-left: 0;
+          justify-self: stretch;
+        }
+        .metric-cost.metric-cost-solo.cost-expand {
+          animation: costExpand 200ms cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .bottom-row .metric-cost {
           width: 220px;
           min-width: 220px;
           max-width: 220px;
+          margin-left: auto;
+          justify-self: end;
           box-sizing: border-box;
         }
 
@@ -2884,6 +3842,86 @@ class PowerCostCard extends HTMLElement {
           justify-content: space-between;
           gap: 12px;
           flex-wrap: wrap;
+        }
+        .three-phase-values {
+          justify-content: flex-start;
+          gap: 18px;
+        }
+        .phase-cards {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+          direction: ltr;
+        }
+        .phase-cards.panel-mode {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .phase-card.total {
+          grid-column: 1 / -1;
+        }
+        .phase-card {
+          border: 1px solid var(--divider-color);
+          border-radius: 12px;
+          padding: 10px;
+          text-align: center;
+          background: transparent;
+        }
+        .phase-card.total {
+          border-color: color-mix(in srgb, var(--primary-color) 58%, var(--divider-color));
+          background: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--primary-color) 10%, transparent),
+            color-mix(in srgb, var(--primary-color) 2%, transparent)
+          );
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-color) 22%, transparent);
+        }
+        .phase-card.total .phase-label {
+          opacity: 0.88;
+          font-weight: 600;
+        }
+        .phase-label {
+          font-size: 14px;
+          opacity: 0.82;
+          margin-bottom: 6px;
+        }
+        .phase-value {
+          font-size: 18px;
+          font-weight: 700;
+          line-height: 1.2;
+        }
+        .phase-extra {
+          font-size: 10px;
+          opacity: 0.66;
+          margin-top: 4px;
+          letter-spacing: 0.2px;
+          white-space: nowrap;
+        }
+
+        @keyframes graphEnter {
+          from {
+            opacity: 0;
+            transform: translateY(6px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes costExpand {
+          from {
+            opacity: 0.75;
+            transform: scale(0.985);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .bottom-row.graph-enter,
+          .metric-cost.metric-cost-solo.cost-expand {
+            animation: none;
+          }
         }
 
         .warn,
@@ -2917,29 +3955,31 @@ class PowerCostCard extends HTMLElement {
 
           ${this._config.show_period_selector ? `
             <div class="periods">
-              <button class="period-btn ${this._period === "day" ? "active" : ""}" data-period="day">היום</button>
-              <button class="period-btn ${this._period === "week" ? "active" : ""}" data-period="week">השבוע</button>
-              <button class="period-btn ${this._period === "month" ? "active" : ""}" data-period="month">החודש</button>
+              <button class="period-btn ${this._period === "day" ? "active" : ""}" data-period="day">${this._t("period_day")}</button>
+              <button class="period-btn ${this._period === "week" ? "active" : ""}" data-period="week">${this._t("period_week")}</button>
+              <button class="period-btn ${this._period === "month" ? "active" : ""}" data-period="month">${this._t("period_month")}</button>
             </div>
           ` : ""}
 
           ${this._config.show_total ? `
             <div class="summary">
+              ${hasCostRows ? `
+                <div class="box">
+                  <div class="label">${this._t("summary_total_cost", { period: this._periodLabel(this._period) })}</div>
+                  <div class="value">${this._formatMoney(totalCost, currency)}</div>
+                  <div class="sub">${this._t("summary_entities_priced", { count: costRows.length })}</div>
+                </div>
+              ` : ""}
               <div class="box">
-                <div class="label">עלות כוללת ${this._periodLabel(this._period)}</div>
-                <div class="value">${this._formatMoney(totalCost, currency)}</div>
-                <div class="sub">${rows.length} ישויות בכרטיס</div>
-              </div>
-              <div class="box">
-                <div class="label">צריכה כוללת</div>
+                <div class="label">${this._t("summary_total_consumption")}</div>
                 <div class="value">kWh ${totalEnergy.toFixed(3)}</div>
-                <div class="sub">חישוב לפי זמן פעילות והספק</div>
+                <div class="sub">${this._t("summary_calc_sub")}</div>
               </div>
             </div>
           ` : ""}
 
           ${top3.length ? `
-            <div class="top-devices-title">המכשירים הכי בזבזניים</div>
+            <div class="top-devices-title">${this._t("top_devices_title")}</div>
             <div class="top-devices" style="grid-template-columns: repeat(${Math.min(top3.length, 3)}, minmax(0, 1fr));">
               ${top3.map((d)=>`
                 <div class="top-device-card">
@@ -2956,7 +3996,7 @@ class PowerCostCard extends HTMLElement {
               ${rows.map((row) => `
                 <div class="row ${this._isRowCollapsed(row) ? "collapsed" : ""} ${this._config.radio_mode ? `radio ${this._isRowCollapsed(row) ? "" : "open"}` : ""}">
                   <div class="row-top">
-                    <div class="row-title" data-more-info="${row.entityId}" title="פתח מידע נוסף">
+                    <div class="row-title" ${row.sourceEntityId ? `data-more-info="${row.sourceEntityId}" title="${this._t("tooltip_more_info")}"` : `title="${this._t("tooltip_info")}"`}>
                       <ha-icon
                         class="entity-icon ${row.isOn && this._config.enable_icon_animation ? "on" : ""}"
                         icon="${row.displayIcon}"
@@ -2967,16 +4007,19 @@ class PowerCostCard extends HTMLElement {
                       </div>
                     </div>
                     <div class="row-controls">
-                      ${(this._config.show_minimize || this._config.radio_mode) && row.allowMinimize ? `
+                      ${(this._config.show_graph && row.sourceEntityId && !this._isRowCollapsed(row)) ? this._renderGraphToggle(row.sourceEntityId) : ""}
+                      ${(this._config.show_minimize || this._config.radio_mode) && row.allowMinimize && row.entityId ? `
                         <button type="button" class="${this._config.radio_mode ? "radio-btn" : "collapse-btn"}" data-collapse-toggle="${row.entityId}">
-                          ${this._config.radio_mode ? (this._isRowCollapsed(row) ? "פתח" : "סגור") : (this._collapsedCards[row.entityId] ? "הצג" : "מזער")}
+                          ${this._config.radio_mode
+                            ? (this._isRowCollapsed(row) ? this._t("btn_open") : this._t("btn_close"))
+                            : (this._collapsedCards[row.entityId] ? this._t("btn_show") : this._t("btn_minimize"))}
                         </button>
                       ` : ""}
-                      ${this._config.show_toggle ? `
-                        <div class="toggle-switch-wrap" data-toggle="${row.entityId}">
+                      ${(this._config.show_toggle && row.sourceEntityId && !row.isThreePhasePanel) ? `
+                        <div class="toggle-switch-wrap" data-toggle="${row.sourceEntityId}">
                           <ha-switch
                             class="toggle-switch"
-                            data-toggle="${row.entityId}"
+                            data-toggle="${row.sourceEntityId}"
                             aria-label="toggle ${row.name}"
                             ${row.isOn ? "checked" : ""}
                           ></ha-switch>
@@ -2986,45 +4029,79 @@ class PowerCostCard extends HTMLElement {
                   </div>
 
                   ${this._isRowCollapsed(row) ? "" : `
-                    <div class="metrics">
-                      <div class="metric">
-                        <div class="label">זמן פעיל ${this._periodLabel(this._period)}</div>
-                        <div class="v">${this._formatDuration(row.onMs)}</div>
-                      </div>
-                      <div class="metric">
-                        <div class="label">הספק לחישוב</div>
-                        <div class="v">${row.powerW != null ? `${row.powerW}W` : "—"}</div>
-                      </div>
-                      <div class="metric">
-                        <div class="label">צריכה</div>
-                        <div class="v">kWh ${row.energyKwh.toFixed(3)}</div>
-                      </div>
-                    </div>
-
-                    ${this._config.show_graph && this._expandedGraphs[row.entityId] ? `
-                      <div class="bottom-row">
-                        ${this._renderPremiumGraph(this._config.entities.find((x) => x.entity === row.entityId) || { entity: row.entityId })}
-                        <div class="metric metric-cost">
-                          <div class="label">עלות</div>
-                          <div class="v">${this._formatMoney(row.cost, row.currency)}</div>
+                    ${row.isThreePhasePanel ? "" : `
+                      <div class="metrics">
+                        <div class="metric">
+                          <div class="label">${this._t("label_active_time", { period: this._periodLabel(this._period) })}</div>
+                          <div class="v">${this._formatDuration(row.onMs)}</div>
                         </div>
-                      </div>
-                    ` : `
-                      <div class="metric metric-cost">
-                        <div class="label">עלות</div>
-                        <div class="v">${this._formatMoney(row.cost, row.currency)}</div>
+                        <div class="metric">
+                          <div class="label">${this._t("label_power_for_calc")}</div>
+                          <div class="v">${row.powerW != null ? `${row.powerW}W` : "—"}</div>
+                        </div>
+                        <div class="metric">
+                          <div class="label">${this._t("label_consumption")}</div>
+                          <div class="v">kWh ${row.energyKwh.toFixed(3)}</div>
+                        </div>
                       </div>
                     `}
 
-                    <div class="sub sub-row">
-                      <span>
-                        מחיר לקוט"ש: ${row.pricePerKwh != null ? row.pricePerKwh : "—"}
-                        ${row.isDynamicPower ? ` • מבוסס כרגע על ${this._config.entities.find((x) => x.entity === row.entityId)?.power_entity}` : ""}
-                      </span>
-                      ${this._config.show_graph ? this._renderGraphToggle(row.entityId) : ""}
-                    </div>
+                    ${this._config.show_graph && row.sourceEntityId && this._expandedGraphs[row.sourceEntityId] ? `
+                      <div class="bottom-row ${this._graphOpenAnimEntity === row.entityId ? "graph-enter" : ""}">
+                        ${this._renderPremiumGraph(this._config.entities.find((x) => x.entity === row.sourceEntityId) || { entity: row.sourceEntityId })}
+                        ${row.isThreePhasePanel ? "" : `
+                          <div class="metric metric-cost">
+                            <div class="label">${this._t("label_cost")}</div>
+                            <div class="v">${this._formatMoney(row.cost, row.currency)}</div>
+                          </div>
+                        `}
+                      </div>
+                    ` : `
+                      ${row.isThreePhasePanel ? "" : `
+                        <div class="metric metric-cost metric-cost-solo ${this._graphCloseAnimEntity === row.entityId ? "cost-expand" : ""}">
+                          <div class="label">${this._t("label_cost")}</div>
+                          <div class="v">${this._formatMoney(row.cost, row.currency)}</div>
+                        </div>
+                      `}
+                    `}
 
-                    ${row.error ? `<div class="error">שגיאה בטעינת היסטוריה: ${row.error}</div>` : ""}
+                    ${(row.isThreePhase || row.isThreePhasePanel) ? `
+                      <div class="phase-cards ${row.isThreePhasePanel ? "panel-mode" : ""}">
+                        <div class="phase-card">
+                          <div class="phase-label">L1</div>
+                          <div class="phase-value">${Math.round(row.phaseData?.l1 || 0)}W</div>
+                          <div class="phase-extra">${this._formatPhaseMetric(row.phaseData?.l1Voltage, "V")} • ${this._formatPhaseMetric(row.phaseData?.l1Current, "A", 1)}</div>
+                        </div>
+                        <div class="phase-card">
+                          <div class="phase-label">L2</div>
+                          <div class="phase-value">${Math.round(row.phaseData?.l2 || 0)}W</div>
+                          <div class="phase-extra">${this._formatPhaseMetric(row.phaseData?.l2Voltage, "V")} • ${this._formatPhaseMetric(row.phaseData?.l2Current, "A", 1)}</div>
+                        </div>
+                        <div class="phase-card">
+                          <div class="phase-label">L3</div>
+                          <div class="phase-value">${Math.round(row.phaseData?.l3 || 0)}W</div>
+                          <div class="phase-extra">${this._formatPhaseMetric(row.phaseData?.l3Voltage, "V")} • ${this._formatPhaseMetric(row.phaseData?.l3Current, "A", 1)}</div>
+                        </div>
+                        ${(row.isThreePhase || row.isThreePhasePanel) ? `
+                          <div class="phase-card total">
+                            <div class="phase-label">${this._t("phase_total_consumption")}</div>
+                            <div class="phase-value">${Math.round(row.powerW || 0)}W</div>
+                          </div>
+                        ` : ""}
+                      </div>
+                    ` : ""}
+
+                    ${row.isThreePhasePanel ? "" : `
+                      ${(row.isDynamicPower && !row.isThreePhase && !row.isThreePhasePanel) ? `
+                        <div class="sub sub-row">
+                          <span>
+                            ${this._t("dynamic_based_on", { entity: this._config.entities.find((x) => x.entity === row.sourceEntityId)?.power_entity || "power_entity" })}
+                          </span>
+                        </div>
+                      ` : ""}
+                    `}
+
+                    ${row.error ? `<div class="error">${this._t("error_history", { error: row.error })}</div>` : ""}
                   `}
                 </div>
               `).join("")}
@@ -3033,24 +4110,26 @@ class PowerCostCard extends HTMLElement {
 
           ${anyDynamic ? `
             <div class="warn">
-              ישויות עם power_entity מחושבות לפי ערך ההספק הנוכחי בזמן התצוגה. זה נוח, אבל פחות מדויק אם ההספק השתנה לאורך התקופה.
+              ${this._t("warn_dynamic_power")}
             </div>
           ` : ""}
 
           ${anyError ? `
             <div class="warn">
-              אם אין היסטוריה לישות מסוימת, ודא שהיא נרשמת ב-recorder ושיש לה נתוני history זמינים.
+              ${this._t("warn_no_history")}
             </div>
           ` : ""}
 
-          ${this._config.show_formula ? `
+          ${this._config.show_formula && hasCostRows ? `
             <div class="footer">
-              נוסחה: זמן פעילות × הספק בוואט ÷ 1000 × מחיר לקוט"ש. הכרטיס מחשב לפי מצב פעיל של הישות בתקופה שנבחרה.
+              ${this._t("formula_text")}
             </div>
           ` : ""}
         </div>
       </ha-card>
     `;
+    this._graphOpenAnimEntity = null;
+    this._graphCloseAnimEntity = null;
 
     const toggleServiceCall = (toggleEntity, nextChecked) => {
       if (!toggleEntity || !this._hass) return;
